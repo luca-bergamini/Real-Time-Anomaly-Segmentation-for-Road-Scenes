@@ -87,17 +87,20 @@ def main():
         with torch.no_grad():
             result = model(images)
 
-        logits = result.squeeze(0).data.cpu().numpy()
-
         if args.method == 'MSP':
-            anomaly_result = 1.0 - np.max(torch.nn.functional.softmax(torch.from_numpy(logits), dim=0).numpy(), axis=0)
+            softmax_probs = torch.nn.functional.softmax(result, dim=1)
+            msp = torch.max(softmax_probs, dim=1)[0].cpu().numpy().squeeze()
+            anomaly_result = 1.0 - msp
 
         elif args.method == 'MaxLogit':
-            anomaly_result = -np.max(logits, axis=0)
+            max_logit = torch.max(result, dim=1)[0]
+            anomaly_result = -max_logit.cpu().numpy().squeeze()
 
         elif args.method == 'MaxEntropy':
-            probs = torch.nn.functional.softmax(torch.from_numpy(logits), dim=0).numpy()
-            anomaly_result = -np.sum(probs * np.log(probs + 1e-10), axis=0)     
+            probs = torch.nn.functional.softmax(result, dim=1)
+            log_probs = torch.log(probs + 1e-8)
+            entropy = -torch.sum(probs * log_probs, dim=1)
+            anomaly_result = entropy.cpu().numpy().squeeze()   
 
         pathGT = path.replace("images", "labels_masks")                
         if "RoadObsticle21" in pathGT:
