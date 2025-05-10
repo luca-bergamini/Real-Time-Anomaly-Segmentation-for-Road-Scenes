@@ -56,8 +56,8 @@ def main():
     modelpath = args.loadDir + args.loadModel
     weightspath = args.loadDir + args.loadWeights
 
-    print ("Loading model: " + modelpath)
-    print ("Loading weights: " + weightspath)
+    #print ("Loading model: " + modelpath)
+    #print ("Loading weights: " + weightspath)
 
     model = ERFNet(NUM_CLASSES)
 
@@ -78,7 +78,7 @@ def main():
         return model
 
     model = load_my_state_dict(model, torch.load(weightspath, map_location=lambda storage, loc: storage))
-    print ("Model and weights LOADED successfully")
+    #print ("Model and weights LOADED successfully")
     model.eval()
 
     image_transform = Compose([Resize((512, 1024), Image.BILINEAR), ToTensor()])
