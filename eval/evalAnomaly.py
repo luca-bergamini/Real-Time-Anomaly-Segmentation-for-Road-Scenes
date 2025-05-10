@@ -86,11 +86,11 @@ def main():
         images = images.permute(0,3,1,2)
         with torch.no_grad():
             result = model(images)
-            
+
         logits = result.squeeze(0).data.cpu().numpy()
 
         if args.method == 'MSP':
-            anomaly_result = 1.0 - np.max(torch.nn.functional.softmax(torch.from_numpy(logits), axis=0).numpy(), axis=0)
+            anomaly_result = 1.0 - np.max(torch.nn.functional.softmax(torch.from_numpy(logits), dim=0).numpy(), axis=0)
 
         elif args.method == 'MaxLogit':
             anomaly_result = -np.max(logits, axis=0)
