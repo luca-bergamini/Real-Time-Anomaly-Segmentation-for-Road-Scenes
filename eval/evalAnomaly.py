@@ -80,16 +80,13 @@ def main():
     model = load_my_state_dict(model, torch.load(weightspath, map_location=lambda storage, loc: storage))
     print ("Model and weights LOADED successfully")
     model.eval()
+
+    image_transform = Compose([Resize((512, 1024), Image.BILINEAR), ToTensor()])
+    target_transform = Compose([Resize((512, 1024), Image.NEAREST)])
     
     for path in glob.glob(os.path.expanduser(str(args.input[0]))):
 
-        image_transform = Compose([
-            Resize((512, 1024), Image.BILINEAR),
-            ToTensor()
-        ])
-        images = image_transform(Image.open(path).convert('RGB')).unsqueeze(0)
-        if not args.cpu:
-            images = images.cuda()
+        images = image_transform((Image.open(path).convert('RGB'))).unsqueeze(0).float().cuda()
 
         with torch.no_grad():
             result = model(images)
@@ -118,7 +115,7 @@ def main():
            pathGT = pathGT.replace("jpg", "png")  
 
         mask = Image.open(pathGT)
-        ood_gts = np.array(mask)
+        ood_gts = np.array(target_transform(mask))
 
         if "RoadAnomaly" in pathGT:
             ood_gts = np.where((ood_gts==2), 1, ood_gts)
