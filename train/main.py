@@ -420,9 +420,13 @@ def main(args):
     #Load Model
     assert os.path.exists(args.model + ".py"), "Error: model definition not found"
     model_file = importlib.import_module(args.model)
-    model = model_file.Net(NUM_CLASSES)
+
+    if args.model == "erfnet":
+        model = model_file.Net(NUM_CLASSES)
+    if args.model == "enet":
+        model = model_file.ENet(NUM_CLASSES)
     copyfile(args.model + ".py", savedir + '/' + args.model + ".py")
-    
+
     if args.cuda:
         model = torch.nn.DataParallel(model).cuda()
     
