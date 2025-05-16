@@ -405,7 +405,7 @@ def main(args):
         myfile.write(str(args))
 
     #Load Model
-    model_dir = "Real-Time-Anomaly-Segmentation-for-Road-Scenes/eval/model/"
+    model_dir = "Real-Time-Anomaly-Segmentation-for-Road-Scenes/eval/"
 
     assert os.path.exists(model_dir + args.model + ".py"), "Error: model definition not found"
     model_file = importlib.import_module(args.model)
