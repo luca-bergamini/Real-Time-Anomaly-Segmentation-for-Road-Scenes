@@ -147,7 +147,7 @@ def train(args, model, enc=False):
     criterion = CrossEntropyLoss2d(weight)
     print(type(criterion))
 
-    savedir = f'{args.savedir}'
+    savedir = f'../save/{args.savedir}'
 
     if (enc):
         automated_log_path = savedir + "/automated_log_encoder.txt"
@@ -230,17 +230,11 @@ def train(args, model, enc=False):
             #print("targets", np.unique(targets[:, 0].cpu().data.numpy()))
 
             optimizer.zero_grad()
-            
-            if args.model == "bisenet":
-                print("Model: ", args.model)
-                outputs = outputs[1]
-            
             loss = criterion(outputs, targets[:, 0])
-            
             loss.backward()
             optimizer.step()
 
-            epoch_loss.append(loss.item())
+            epoch_loss.append(loss.data[0])
             time_train.append(time.time() - start_time)
 
             if (doIouTrain):
@@ -297,14 +291,10 @@ def train(args, model, enc=False):
 
             inputs = Variable(images, volatile=True)    #volatile flag makes it free backward or outputs for eval
             targets = Variable(labels, volatile=True)
-            outputs = model(inputs, only_encode=enc)
-            
-            if args.model == "bisenet":
-                print("Model: ", args.model)
-                outputs = outputs[1] 
+            outputs = model(inputs, only_encode=enc) 
 
             loss = criterion(outputs, targets[:, 0])
-            epoch_loss_val.append(loss.item())
+            epoch_loss_val.append(loss.data[0])
             time_val.append(time.time() - start_time)
 
 
@@ -408,11 +398,10 @@ def main(args):
         myfile.write(str(args))
 
     #Load Model
-    model_dir = "Real-Time-Anomaly-Segmentation-for-Road-Scenes/train/"
-    assert os.path.exists(model_dir + args.model + ".py"), "Error: model definition not found"
+    assert os.path.exists(args.model + ".py"), "Error: model definition not found"
     model_file = importlib.import_module(args.model)
     model = model_file.Net(NUM_CLASSES)
-    copyfile(model_dir + args.model + ".py", savedir + '/' + args.model + ".py")
+    copyfile(args.model + ".py", savedir + '/' + args.model + ".py")
     
     if args.cuda:
         model = torch.nn.DataParallel(model).cuda()

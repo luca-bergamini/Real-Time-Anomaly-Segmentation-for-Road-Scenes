@@ -1,9 +1,11 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import torch.utils.model_zoo as modelzoo
 
 resnet18_url = 'https://download.pytorch.org/models/resnet18-5c106cde.pth'
+
+
+from torch.nn import BatchNorm2d
 
 
 def conv3x3(in_planes, out_planes, stride=1):
@@ -16,16 +18,16 @@ class BasicBlock(nn.Module):
     def __init__(self, in_chan, out_chan, stride=1):
         super(BasicBlock, self).__init__()
         self.conv1 = conv3x3(in_chan, out_chan, stride)
-        self.bn1 = nn.BatchNorm2d(out_chan)
+        self.bn1 = BatchNorm2d(out_chan)
         self.conv2 = conv3x3(out_chan, out_chan)
-        self.bn2 = nn.BatchNorm2d(out_chan)
+        self.bn2 = BatchNorm2d(out_chan)
         self.relu = nn.ReLU(inplace=True)
         self.downsample = None
         if in_chan != out_chan or stride != 1:
             self.downsample = nn.Sequential(
                 nn.Conv2d(in_chan, out_chan,
                           kernel_size=1, stride=stride, bias=False),
-                nn.BatchNorm2d(out_chan),
+                BatchNorm2d(out_chan),
                 )
 
     def forward(self, x):
@@ -56,7 +58,7 @@ class Resnet18(nn.Module):
         super(Resnet18, self).__init__()
         self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3,
                                bias=False)
-        self.bn1 = nn.BatchNorm2d(64)
+        self.bn1 = BatchNorm2d(64)
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
         self.layer1 = create_layer_basic(64, 64, bnum=2, stride=1)
