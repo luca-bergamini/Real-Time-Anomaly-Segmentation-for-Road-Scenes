@@ -230,11 +230,16 @@ def train(args, model, enc=False):
             #print("targets", np.unique(targets[:, 0].cpu().data.numpy()))
 
             optimizer.zero_grad()
+            
+            if args.model == "bisenet":
+                outputs = outputs[1]
+            
             loss = criterion(outputs, targets[:, 0])
+            
             loss.backward()
             optimizer.step()
 
-            epoch_loss.append(loss.data[0])
+            epoch_loss.append(loss.item())
             time_train.append(time.time() - start_time)
 
             if (doIouTrain):
@@ -291,10 +296,13 @@ def train(args, model, enc=False):
 
             inputs = Variable(images, volatile=True)    #volatile flag makes it free backward or outputs for eval
             targets = Variable(labels, volatile=True)
-            outputs = model(inputs, only_encode=enc) 
+            outputs = model(inputs, only_encode=enc)
+            
+            if args.model == "bisenet":
+                outputs = outputs[1] 
 
             loss = criterion(outputs, targets[:, 0])
-            epoch_loss_val.append(loss.data[0])
+            epoch_loss_val.append(loss.item())
             time_val.append(time.time() - start_time)
 
 
