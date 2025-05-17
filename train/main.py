@@ -238,7 +238,7 @@ def train(args, model, enc=False):
             loss.backward()
             optimizer.step()
 
-            epoch_loss.append(loss.item())
+            epoch_loss.append(loss.data[0])
             time_train.append(time.time() - start_time)
 
             if (doIouTrain):
@@ -301,7 +301,7 @@ def train(args, model, enc=False):
                 outputs = outputs[1]
 
             loss = criterion(outputs, targets[:, 0])
-            epoch_loss_val.append(loss.intem())
+            epoch_loss_val.append(loss.data[0])
             time_val.append(time.time() - start_time)
 
 
