@@ -1,10 +1,12 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
+import torchvision
 
 from resnet import Resnet18
 
-class ConvBNReLU(nn.Module):
 
+class ConvBNReLU(nn.Module):
     def __init__(self, in_chan, out_chan, ks=3, stride=1, padding=1, *args, **kwargs):
         super(ConvBNReLU, self).__init__()
         self.conv = nn.Conv2d(in_chan,
@@ -29,9 +31,7 @@ class ConvBNReLU(nn.Module):
                 nn.init.kaiming_normal_(ly.weight, a=1)
                 if not ly.bias is None: nn.init.constant_(ly.bias, 0)
 
-
 class UpSample(nn.Module):
-
     def __init__(self, n_chan, factor=2):
         super(UpSample, self).__init__()
         out_chan = n_chan * factor * factor
@@ -47,9 +47,7 @@ class UpSample(nn.Module):
     def init_weight(self):
         nn.init.xavier_normal_(self.proj.weight, gain=1.)
 
-
 class BiSeNetOutput(nn.Module):
-
     def __init__(self, in_chan, mid_chan, n_classes, up_factor=32, *args, **kwargs):
         super(BiSeNetOutput, self).__init__()
         self.up_factor = up_factor
@@ -83,7 +81,6 @@ class BiSeNetOutput(nn.Module):
                 nowd_params += list(module.parameters())
         return wd_params, nowd_params
 
-
 class AttentionRefinementModule(nn.Module):
     def __init__(self, in_chan, out_chan, *args, **kwargs):
         super(AttentionRefinementModule, self).__init__()
@@ -108,7 +105,6 @@ class AttentionRefinementModule(nn.Module):
             if isinstance(ly, nn.Conv2d):
                 nn.init.kaiming_normal_(ly.weight, a=1)
                 if not ly.bias is None: nn.init.constant_(ly.bias, 0)
-
 
 class ContextPath(nn.Module):
     def __init__(self, *args, **kwargs):
@@ -159,7 +155,6 @@ class ContextPath(nn.Module):
                 nowd_params += list(module.parameters())
         return wd_params, nowd_params
 
-
 class SpatialPath(nn.Module):
     def __init__(self, *args, **kwargs):
         super(SpatialPath, self).__init__()
@@ -192,7 +187,6 @@ class SpatialPath(nn.Module):
             elif isinstance(module, nn.modules.batchnorm._BatchNorm):
                 nowd_params += list(module.parameters())
         return wd_params, nowd_params
-
 
 class FeatureFusionModule(nn.Module):
     def __init__(self, in_chan, out_chan, *args, **kwargs):
@@ -254,7 +248,6 @@ class FeatureFusionModule(nn.Module):
 
 
 class CustomArgMax(torch.autograd.Function):
-
     @staticmethod
     def forward(ctx, feat_out, dim):
         return feat_out.argmax(dim=dim).int()
@@ -263,9 +256,7 @@ class CustomArgMax(torch.autograd.Function):
     def symbolic(g, feat_out, dim: int):
         return g.op('CustomArgMax', feat_out, dim_i=dim)
 
-
 class Net(nn.Module):
-
     def __init__(self, n_classes, aux_mode='train', *args, **kwargs):
         super(Net, self).__init__()
         self.cp = ContextPath()
@@ -278,7 +269,7 @@ class Net(nn.Module):
             self.conv_out32 = BiSeNetOutput(128, 64, n_classes, up_factor=16)
         self.init_weight()
 
-    def forward(self, x, only_encode=False): # only_encode is set only for coherence with erfnet.py, here is not used
+    def forward(self, x, only_encode=False): # only_encode is used only for coherence with erfnet.py
         H, W = x.size()[2:]
         feat_cp8, feat_cp16 = self.cp(x)
         feat_sp = self.sp(x)
