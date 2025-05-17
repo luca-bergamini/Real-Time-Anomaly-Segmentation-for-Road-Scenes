@@ -45,6 +45,8 @@ def main():
     parser.add_argument('--cpu', action='store_true')
     parser.add_argument('--method', default='MSP', choices=['MSP', 'MaxLogit', 'MaxEntropy'],
                     help="Choose OOD scoring method: MSP, MaxLogit, or MaxEntropy")
+    parser.add_argument('--temperature', type=float, default=1.0,
+                    help="Temperature scaling for softmax/logit OOD scoring")
     args = parser.parse_args()
     anomaly_score_list = []
     ood_gts_list = []
@@ -89,7 +91,7 @@ def main():
         images = image_transform((Image.open(path).convert('RGB'))).unsqueeze(0).float().cuda()
 
         with torch.no_grad():
-            result = model(images)
+            result = model(images)/ args.temperature
 
         if args.method == 'MSP':
             softmax_probs = torch.nn.functional.softmax(result, dim=1)
