@@ -76,7 +76,7 @@ class CrossEntropyLoss2d(torch.nn.Module):
     def __init__(self, weight=None):
         super().__init__()
 
-        self.loss = torch.nn.NLLLoss2d(weight)
+        self.loss = torch.nn.NLLLoss(weight)
 
     def forward(self, outputs, targets):
         return self.loss(torch.nn.functional.log_softmax(outputs, dim=1), targets)
@@ -244,7 +244,11 @@ def train(args, model, enc=False):
             loss.backward()
             optimizer.step()
 
-            epoch_loss.append(loss.data[0])
+            if args.model == "bisenet":
+                epoch_loss.append(loss.item())
+            else:
+                epoch_loss.append(loss.data[0])
+
             time_train.append(time.time() - start_time)
 
             if (doIouTrain):
@@ -312,7 +316,11 @@ def train(args, model, enc=False):
                 loss = criterion(outputs, targets[:, 0])
 
             #loss = criterion(outputs, targets[:, 0])
-            epoch_loss_val.append(loss.data[0])
+            if args.model == "bisenet":
+                epoch_loss.append(loss.item())
+            else:
+                epoch_loss.append(loss.data[0])
+                
             time_val.append(time.time() - start_time)
 
 
