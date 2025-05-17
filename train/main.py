@@ -232,7 +232,7 @@ def train(args, model, enc=False):
             optimizer.zero_grad()
             
             if args.model == "bisenet":
-                outputs = outputs[1]
+                outputs = outputs[0]
             
             loss = criterion(outputs, targets[:, 0])
             
@@ -299,7 +299,7 @@ def train(args, model, enc=False):
             outputs = model(inputs, only_encode=enc)
             
             if args.model == "bisenet":
-                outputs = outputs[1] 
+                outputs = outputs[0] 
 
             loss = criterion(outputs, targets[:, 0])
             epoch_loss_val.append(loss.item())
