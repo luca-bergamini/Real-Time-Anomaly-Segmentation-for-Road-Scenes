@@ -278,7 +278,7 @@ class BiSeNet(nn.Module):
             self.conv_out32 = BiSeNetOutput(128, 64, n_classes, up_factor=16)
         self.init_weight()
 
-    def forward(self, x):
+    def forward(self, x, only_encode=False): # only_encode is set only for coherence with erfnet.py, here is not used
         H, W = x.size()[2:]
         feat_cp8, feat_cp16 = self.cp(x)
         feat_sp = self.sp(x)
