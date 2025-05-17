@@ -42,8 +42,8 @@ def main(args):
     modelpath = args.loadDir + args.loadModel
     weightspath = args.loadDir + args.loadWeights
 
-    print ("Loading model: " + modelpath)
-    print ("Loading weights: " + weightspath)
+    #print ("Loading model: " + modelpath)
+    #print ("Loading weights: " + weightspath)
 
     model = ERFNet(NUM_CLASSES)
 
@@ -65,7 +65,7 @@ def main(args):
         return model
 
     model = load_my_state_dict(model, torch.load(weightspath, map_location=lambda storage, loc: storage))
-    print ("Model and weights LOADED successfully")
+    #print ("Model and weights LOADED successfully")
 
 
     model.eval()
@@ -94,7 +94,7 @@ def main(args):
 
         filenameSave = filename[0].split("leftImg8bit/")[1] 
 
-        print (step, filenameSave)
+        #print (step, filenameSave)
 
 
     iouVal, iou_classes = iouEvalVal.getIoU()
