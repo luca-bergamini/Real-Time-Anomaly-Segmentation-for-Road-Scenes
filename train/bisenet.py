@@ -264,10 +264,10 @@ class CustomArgMax(torch.autograd.Function):
         return g.op('CustomArgMax', feat_out, dim_i=dim)
 
 
-class BiSeNet(nn.Module):
+class Net(nn.Module):
 
     def __init__(self, n_classes, aux_mode='train', *args, **kwargs):
-        super(BiSeNet, self).__init__()
+        super(Net, self).__init__()
         self.cp = ContextPath()
         self.sp = SpatialPath()
         self.ffm = FeatureFusionModule(256, 256)
@@ -318,7 +318,7 @@ class BiSeNet(nn.Module):
 
 
 if __name__ == "__main__":
-    net = BiSeNet(19)
+    net = Net(19)
     net.cuda()
     net.eval()
     in_ten = torch.randn(16, 3, 640, 480).cuda()
