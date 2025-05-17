@@ -320,6 +320,7 @@ def train(args, model, enc=False):
             #loss = criterion(outputs, targets[:, 0])
             if args.model == "bisenet":
                 epoch_loss.append(loss.item())
+                epoch_loss_val.append(loss.item())
             else:
                 epoch_loss.append(loss.data[0])
                 
