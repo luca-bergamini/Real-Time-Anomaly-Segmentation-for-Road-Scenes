@@ -80,14 +80,8 @@ class CrossEntropyLoss2d(torch.nn.Module):
 
     def forward(self, outputs, targets):
         return self.loss(torch.nn.functional.log_softmax(outputs, dim=1), targets)
-
-
-def train(args, model, enc=False):
-    best_acc = 0
-
-    #TODO: calculate weights by processing dataset histogram (now its being set by hand from the torch values)
-    #create a loder to run all images and calculate histogram of labels, then create weight array using class balancing
-
+    
+def return_weights(enc):
     weight = torch.ones(NUM_CLASSES)
     if (enc):
         weight[0] = 2.3653597831726	
@@ -131,6 +125,29 @@ def train(args, model, enc=False):
         weight[18] = 10.138095855713	
 
     weight[19] = 0
+    return weight
+
+def compute_weights(dataloader, num_classes, c=1.02):
+    class_count = 0
+    total = 0
+    for _, label in dataloader:
+        label = label.cpu().numpy()
+        flat_label = label.flatten()
+        class_count += np.bincount(flat_label, minlength=num_classes)
+        total += flat_label.size
+    
+    propensity_score = class_count / total
+    class_weights = 1 / (np.log(c + propensity_score))
+    return class_weights
+
+def train(args, model, enc=False):
+    best_acc = 0
+
+    #TODO: calculate weights by processing dataset histogram (now its being set by hand from the torch values)
+    #create a loder to run all images and calculate histogram of labels, then create weight array using class balancing
+
+    #weight = return_weights(enc) #normal method
+    weight = compute_weights(loader, NUM_CLASSES) #weight including the void class
 
     assert os.path.exists(args.datadir), "Error: datadir (dataset directory) could not be loaded"
 
