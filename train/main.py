@@ -388,21 +388,21 @@ def save_checkpoint(state, is_best, filenameCheckpoint, filenameBest):
         torch.save(state, filenameBest)
 
 
-    def main(args):
-        savedir = f'../save/{args.savedir}'
+def main(args):
+    savedir = f'../save/{args.savedir}'
 
-        if not os.path.exists(savedir):
-            os.makedirs(savedir)
+    if not os.path.exists(savedir):
+        os.makedirs(savedir)
 
-        with open(savedir + '/opts.txt', "w") as myfile:
-            myfile.write(str(args))
+    with open(savedir + '/opts.txt', "w") as myfile:
+        myfile.write(str(args))
 
-        #Load Model
-        model_dir = "Real-Time-Anomaly-Segmentation-for-Road-Scenes/train/"
-        assert os.path.exists(model_dir + args.model + ".py"), "Error: model definition not found"
-        model_file = importlib.import_module(args.model)
-        model = model_file.Net(NUM_CLASSES)
-        copyfile(model_dir + args.model + ".py", savedir + '/' + args.model + ".py")
+    #Load Model
+    model_dir = "Real-Time-Anomaly-Segmentation-for-Road-Scenes/train/"
+    assert os.path.exists(model_dir + args.model + ".py"), "Error: model definition not found"
+    model_file = importlib.import_module(args.model)
+    model = model_file.Net(NUM_CLASSES)
+    copyfile(model_dir + args.model + ".py", savedir + '/' + args.model + ".py")
     
     if args.cuda:
         model = torch.nn.DataParallel(model).cuda()
