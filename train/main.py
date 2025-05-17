@@ -435,7 +435,7 @@ def save_checkpoint(state, is_best, filenameCheckpoint, filenameBest):
 
 
 def main(args):
-    savedir = {args.savedir}
+    savedir = args.savedir
 
     if not os.path.exists(savedir):
         os.makedirs(savedir)
