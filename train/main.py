@@ -230,7 +230,17 @@ def train(args, model, enc=False):
             #print("targets", np.unique(targets[:, 0].cpu().data.numpy()))
 
             optimizer.zero_grad()
-            loss = criterion(outputs, targets[:, 0])
+            
+            if args.model == "bisenet":
+                main_out, aux1_out, aux2_out = outputs
+                loss = criterion(main_out, targets[:, 0]) \
+                    + 0.4 * criterion(aux1_out, targets[:, 0]) \
+                    + 0.4 * criterion(aux2_out, targets[:, 0])
+            else:
+                loss = criterion(outputs, targets[:, 0])
+
+            #loss = criterion(outputs, targets[:, 0])
+            
             loss.backward()
             optimizer.step()
 
@@ -291,9 +301,17 @@ def train(args, model, enc=False):
 
             inputs = Variable(images, volatile=True)    #volatile flag makes it free backward or outputs for eval
             targets = Variable(labels, volatile=True)
-            outputs = model(inputs, only_encode=enc) 
+            outputs = model(inputs, only_encode=enc)
+            
+            if args.model == "bisenet":
+                main_out, aux1_out, aux2_out = outputs
+                loss = criterion(main_out, targets[:, 0]) \
+                    + 0.4 * criterion(aux1_out, targets[:, 0]) \
+                    + 0.4 * criterion(aux2_out, targets[:, 0])
+            else:
+                loss = criterion(outputs, targets[:, 0])
 
-            loss = criterion(outputs, targets[:, 0])
+            #loss = criterion(outputs, targets[:, 0])
             epoch_loss_val.append(loss.data[0])
             time_val.append(time.time() - start_time)
 
