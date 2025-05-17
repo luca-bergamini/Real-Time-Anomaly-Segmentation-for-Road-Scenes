@@ -398,7 +398,7 @@ def main(args):
         myfile.write(str(args))
 
     #Load Model
-    assert os.path.exists(args.model + ".py"), "Error: model definition not found"
+    assert os.path.exists("Real-Time-Anomaly-Segmentation-for-Road-Scenes/train/" + args.model + ".py"), "Error: model definition not found"
     model_file = importlib.import_module(args.model)
     model = model_file.Net(NUM_CLASSES)
     copyfile(args.model + ".py", savedir + '/' + args.model + ".py")
