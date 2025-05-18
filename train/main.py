@@ -128,17 +128,20 @@ def return_weights(enc):
     return weight
 
 def compute_weights(dataloader, num_classes, c=1.02):
-    class_count = 0
+    class_counts = torch.zeros(num_classes, dtype=torch.float64)
     total = 0
-    for _, label in dataloader:
-        label = label.cpu().numpy()
-        flat_label = label.flatten()
-        class_count += np.bincount(flat_label, minlength=num_classes)
-        total += flat_label.size
-    
-    propensity_score = class_count / total
-    class_weights = 1 / (np.log(c + propensity_score))
-    return class_weights
+
+    for _, labels in dataloader:
+        labels = labels.view(-1)
+        for cls in range(num_classes):
+            class_counts[cls] += (labels == cls).sum().item()
+        total += labels.numel()
+
+    propensity_score = class_counts / total
+    class_weights = 1.0 / torch.log(c + propensity_score)
+
+    return class_weights.float()
+
 
 def train(args, model, enc=False):
     best_acc = 0
