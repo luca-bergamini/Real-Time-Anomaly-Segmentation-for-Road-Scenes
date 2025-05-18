@@ -46,7 +46,7 @@ def main(args):
     #print ("Loading weights: " + weightspath)
 
     #model = ERFNet(NUM_CLASSES)
-    model_file = importlib.import_module(args.loadModel[:-3])
+    model_file = importlib.import_module("./train/" + args.loadModel[:-3])
     model = model_file.Net(NUM_CLASSES)
 
     #model = torch.nn.DataParallel(model)
