@@ -116,8 +116,8 @@ def main(args):
         with torch.no_grad():
             outputs = model(inputs)
         
-        if args.loadModel == "bisenet.py":
-            outputs = outputs[1]
+        if os.path.splitext(os.path.basename(args.loadModel))[0] == "bisenet":
+            outputs = outputs[0]
 
         iouEvalVal.addBatch(outputs.max(1)[1].unsqueeze(1).data, labels)
 
