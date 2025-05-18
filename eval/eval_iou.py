@@ -46,7 +46,20 @@ def main(args):
     #print ("Loading weights: " + weightspath)
 
     #model = ERFNet(NUM_CLASSES)
-    model_file = importlib.import_module(args.loadModel[:-3])
+    #model_file = importlib.import_module(args.loadModel[:-3])
+    
+    
+    model_path = args.loadModel
+    model_name = "bisenet"
+
+    if not os.path.isabs(model_path):
+        # Convert to absolute path relative to current working directory
+        model_path = os.path.abspath(model_path)
+
+    spec = importlib.util.spec_from_file_location(model_name, model_path)
+    model_file = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(model_file)
+    
     model = model_file.Net(NUM_CLASSES)
 
     #model = torch.nn.DataParallel(model)
