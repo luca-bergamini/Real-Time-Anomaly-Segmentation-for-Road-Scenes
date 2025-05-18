@@ -9,6 +9,7 @@ import torch.nn.functional as F
 import os
 import importlib
 import time
+import sys
 
 from PIL import Image
 from argparse import ArgumentParser
@@ -48,6 +49,10 @@ def main(args):
     #model = ERFNet(NUM_CLASSES)
     #model_file = importlib.import_module(args.loadModel[:-3])
     
+    # Add the `train/` directory to sys.path
+    train_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "train"))
+    if train_dir not in sys.path:
+        sys.path.insert(0, train_dir)
     
     model_path = args.loadModel
     model_name = "bisenet"
