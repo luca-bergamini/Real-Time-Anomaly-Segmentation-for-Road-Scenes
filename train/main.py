@@ -256,7 +256,7 @@ def train(args, model, enc=False):
                 loss = criterion(main_out, targets[:, 0]) \
                     + 0.4 * criterion(aux1_out, targets[:, 0]) \
                     + 0.4 * criterion(aux2_out, targets[:, 0])
-                outputs = outputs[0]
+                outputs = (main_out + 0.4 * aux1_out + 0.4 * aux2_out) / 1.8
             else:
                 loss = criterion(outputs, targets[:, 0])
 
@@ -333,7 +333,7 @@ def train(args, model, enc=False):
                 loss = criterion(main_out, targets[:, 0]) \
                     + 0.4 * criterion(aux1_out, targets[:, 0]) \
                     + 0.4 * criterion(aux2_out, targets[:, 0])
-                outputs = outputs[0]
+                outputs = (main_out + 0.4 * aux1_out + 0.4 * aux2_out) / 1.8
             else:
                 loss = criterion(outputs, targets[:, 0])
 

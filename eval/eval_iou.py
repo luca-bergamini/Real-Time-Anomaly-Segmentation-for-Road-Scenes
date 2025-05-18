@@ -117,7 +117,7 @@ def main(args):
             outputs = model(inputs)
         
         if os.path.splitext(os.path.basename(args.loadModel))[0] == "bisenet":
-            outputs = outputs[0]
+            outputs = outputs[1]
 
         iouEvalVal.addBatch(outputs.max(1)[1].unsqueeze(1).data, labels)
 
