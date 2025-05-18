@@ -146,9 +146,6 @@ def train(args, model, enc=False):
     #TODO: calculate weights by processing dataset histogram (now its being set by hand from the torch values)
     #create a loder to run all images and calculate histogram of labels, then create weight array using class balancing
 
-    #weight = return_weights(enc) #normal method
-    weight = compute_weights(loader, NUM_CLASSES) #weight including the void class
-
     assert os.path.exists(args.datadir), "Error: datadir (dataset directory) could not be loaded"
 
     co_transform = MyCoTransform(enc, augment=True, height=args.height)#1024)
@@ -158,6 +155,9 @@ def train(args, model, enc=False):
 
     loader = DataLoader(dataset_train, num_workers=args.num_workers, batch_size=args.batch_size, shuffle=True)
     loader_val = DataLoader(dataset_val, num_workers=args.num_workers, batch_size=args.batch_size, shuffle=False)
+    
+    #weight = return_weights(enc) #normal method
+    weight = compute_weights(loader, NUM_CLASSES) #weight including the void class
 
     if args.cuda:
         weight = weight.cuda()
