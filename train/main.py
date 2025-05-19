@@ -256,8 +256,7 @@ def train(args, model, enc=False):
                 loss = criterion(main_out, targets[:, 0]) \
                     + 0.4 * criterion(aux1_out, targets[:, 0]) \
                     + 0.4 * criterion(aux2_out, targets[:, 0])
-                #outputs = (main_out + 0.4 * aux1_out + 0.4 * aux2_out) / 1.8
-                outputs = outputs[1]
+                outputs = outputs[0]
             else:
                 loss = criterion(outputs, targets[:, 0])
 
@@ -330,15 +329,10 @@ def train(args, model, enc=False):
             outputs = model(inputs, only_encode=enc)
             
             if args.model == "bisenet":
-                main_out, aux1_out, aux2_out = outputs
-                loss = criterion(main_out, targets[:, 0]) \
-                    + 0.4 * criterion(aux1_out, targets[:, 0]) \
-                    + 0.4 * criterion(aux2_out, targets[:, 0])
-                outputs = outputs[1]
-            else:
-                loss = criterion(outputs, targets[:, 0])
+                outputs = outputs[0]
 
-            #loss = criterion(outputs, targets[:, 0])
+            loss = criterion(outputs, targets[:, 0])
+            
             if args.model == "bisenet":
                 epoch_loss.append(loss.item())
                 epoch_loss_val.append(loss.item())
