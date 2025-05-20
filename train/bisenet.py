@@ -293,7 +293,7 @@ class Net(nn.Module):
             feat_out32 = self.conv_out32(feat_cp16)
             return feat_out, feat_out16, feat_out32
         elif self.aux_mode == 'eval':
-            return feat_out,
+            return feat_out
         elif self.aux_mode == 'pred':
             #  feat_out = feat_out.argmax(dim=1)
             feat_out = CustomArgMax.apply(feat_out, 1)

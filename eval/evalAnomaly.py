@@ -7,6 +7,7 @@ import random
 from PIL import Image
 import numpy as np
 from erfnet import ERFNet
+import importlib
 import os.path as osp
 from argparse import ArgumentParser
 from ood_metrics import fpr_at_95_tpr, calc_metrics, plot_roc, plot_pr,plot_barcode
@@ -45,6 +46,7 @@ def main():
     parser.add_argument('--cpu', action='store_true')
     parser.add_argument('--method', default='MSP', choices=['MSP', 'MaxLogit', 'MaxEntropy'],
                     help="Choose OOD scoring method: MSP, MaxLogit, or MaxEntropy")
+    parser.add_argument('--void', action='store_true')
     args = parser.parse_args()
     anomaly_score_list = []
     ood_gts_list = []
@@ -59,7 +61,9 @@ def main():
     #print ("Loading model: " + modelpath)
     #print ("Loading weights: " + weightspath)
 
-    model = ERFNet(NUM_CLASSES)
+    model_file = importlib.import_module(args.loadModel[:-3])
+    model = model_file.Net(NUM_CLASSES)
+    #model = ERFNet(NUM_CLASSES)
 
     if (not args.cpu):
         model = torch.nn.DataParallel(model).cuda()
@@ -90,8 +94,13 @@ def main():
 
         with torch.no_grad():
             result = model(images)
+            
+        if args.loadModel == "bisenet.py":
+            result = result[0]
 
-        if args.method == 'MSP':
+        if args.void:
+            anomaly_result = -result[:, 19, :, :].cpu().numpy().squeeze()
+        elif args.method == 'MSP':
             softmax_probs = torch.nn.functional.softmax(result, dim=1)
             msp = torch.max(softmax_probs, dim=1)[0].cpu().numpy().squeeze()
             anomaly_result = 1.0 - msp
