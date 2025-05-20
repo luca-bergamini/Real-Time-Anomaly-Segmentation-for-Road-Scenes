@@ -126,21 +126,6 @@ def return_weights(enc):
 
     weight[19] = 0
     return weight
-
-""" def compute_weights(dataloader, num_classes, c=1.02):
-    class_counts = torch.zeros(num_classes, dtype=torch.float64)
-    total = 0
-
-    for _, labels in dataloader:
-        labels = labels.view(-1)
-        for cls in range(num_classes):
-            class_counts[cls] += (labels == cls).sum().item()
-        total += labels.numel()
-
-    propensity_score = class_counts / total
-    class_weights = 1.0 / torch.log(c + propensity_score)
-
-    return class_weights.float() """
     
 def compute_void_weight(dataloader, void_class=19, c=1.02):
     void_count = 0
@@ -178,10 +163,9 @@ def train(args, model, enc=False):
     loader_val = DataLoader(dataset_val, num_workers=args.num_workers, batch_size=args.batch_size, shuffle=False)
     
     #weight = return_weights(enc) #normal method
-    #weight = compute_weights(loader, NUM_CLASSES) #weight including the void class
     
-    void_weight = compute_void_weight(loader)
-    weight = return_weights(enc).clone()
+    void_weight = compute_void_weight(loader) #calculating weight for void class
+    weight = return_weights(enc).clone() #getting pre-computed weights
     weight[19] = void_weight
 
     if args.cuda:
