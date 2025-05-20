@@ -71,21 +71,6 @@ class MyCoTransform(object):
         return input, target
 
 
-class ENetTransform(object):
-    def __init__(self, height=512, width=1024):
-        self.height = height
-        self.width = width
-    
-    def __call__(self, input, target):
-        input =  Resize(self.height, Image.BILINEAR)(input)
-        target = Resize(self.height, Image.NEAREST)(target)
-        
-        input = ToTensor()(input)
-        target = ToLabel()(target)
-        target = Relabel(255, 19)(target)
-        return input, target
-        
-
 class CrossEntropyLoss2d(torch.nn.Module):
 
     def __init__(self, weight=None):
@@ -164,17 +149,10 @@ def train(args, model, enc=False):
     #TODO: calculate weights by processing dataset histogram (now its being set by hand from the torch values)
     #create a loder to run all images and calculate histogram of labels, then create weight array using class balancing
 
-
-
     assert os.path.exists(args.datadir), "Error: datadir (dataset directory) could not be loaded"
 
-    if args.model == "erfnet":
-        co_transform = MyCoTransform(enc, augment=True, height=args.height)#1024)
-        co_transform_val = MyCoTransform(enc, augment=False, height=args.height)#1024)
-    elif args.model == "enet":
-        co_transform = ENetTransform()
-        co_transform_val = ENetTransform()
-
+    co_transform = MyCoTransform(enc, augment=True, height=args.height)#1024)
+    co_transform_val = MyCoTransform(enc, augment=False, height=args.height)#1024)
     dataset_train = cityscapes(args.datadir, co_transform, 'train')
     dataset_val = cityscapes(args.datadir, co_transform_val, 'val')
 
@@ -184,30 +162,9 @@ def train(args, model, enc=False):
     #weight = return_weights(enc) #normal method
     weight = compute_weights(loader, NUM_CLASSES) #weight including the void class
 
-    # Select weights file based on model
-    os.makedirs("./class_weights", exist_ok=True)
-    if args.model == "enet":
-        weights_file = "./class_weights/enet_weights.npy"
-    elif args.model == "erfnet":
-        if enc:
-            weights_file = "./class_weights/erfnet_encoder_weights.npy"
-        else: 
-            weights_file = "./class_weights/erfnet_decoder_weights.npy"
-    else:
-        raise ValueError("Unsupported model type")    
-
-    # Check if weights file exists, if not compute and save it
-    if not os.path.exists(weights_file):
-        class_weights = compute_class_weights(loader, NUM_CLASSES)
-        np.save(weights_file, class_weights)
-    else:
-        class_weights = np.load(weights_file)
-    # Convert to torch tensor
-    class_weights = torch.from_numpy(class_weights).float()
     if args.cuda:
-        class_weights = class_weights.cuda()
-
-    criterion = CrossEntropyLoss2d(class_weights)
+        weight = weight.cuda()
+    criterion = CrossEntropyLoss2d(weight)
     print(type(criterion))
 
     savedir = args.savedir
@@ -487,13 +444,9 @@ def main(args):
     #Load Model
     assert os.path.exists(args.model + ".py"), "Error: model definition not found"
     model_file = importlib.import_module(args.model)
-
-    if args.model == "erfnet":
-        model = model_file.Net(NUM_CLASSES)
-    if args.model == "enet":
-        model = model_file.ENet(NUM_CLASSES)
+    model = model_file.Net(NUM_CLASSES)
     copyfile(args.model + ".py", savedir + '/' + args.model + ".py")
-
+    
     if args.cuda:
         model = torch.nn.DataParallel(model).cuda()
     
@@ -546,33 +499,29 @@ def main(args):
     f.close()
     """
 
-    if args.model == "erfnet":
-        #train(args, model)
-        if (not args.decoder):
-            print("========== ENCODER TRAINING ===========")
-            model = train(args, model, True) #Train encoder
-        #CAREFUL: for some reason, after training encoder alone, the decoder gets weights=0. 
-        #We must reinit decoder weights or reload network passing only encoder in order to train decoder
-        print("========== DECODER TRAINING ===========")
-        if (not args.state):
-            if args.pretrainedEncoder:
-                print("Loading encoder pretrained in imagenet")
-                from erfnet_imagenet import ERFNet as ERFNet_imagenet
-                pretrainedEnc = torch.nn.DataParallel(ERFNet_imagenet(1000))
-                pretrainedEnc.load_state_dict(torch.load(args.pretrainedEncoder)['state_dict'])
-                pretrainedEnc = next(pretrainedEnc.children()).features.encoder
-                if (not args.cuda):
-                    pretrainedEnc = pretrainedEnc.cpu()     #because loaded encoder is probably saved in cuda
-            else:
-                pretrainedEnc = next(model.children()).encoder
-            model = model_file.Net(NUM_CLASSES, encoder=pretrainedEnc)  #Add decoder to encoder
-            if args.cuda:
-                model = torch.nn.DataParallel(model).cuda()
-            #When loading encoder reinitialize weights for decoder because they are set to 0 when training dec
-        model = train(args, model, False)   #Train decoder
-    elif args.model == "enet":
-        print("========== TRAINING ENET ===========")
-        model = train(args, model)
+    #train(args, model)
+    if (not args.decoder):
+        print("========== ENCODER TRAINING ===========")
+        model = train(args, model, True) #Train encoder
+    #CAREFUL: for some reason, after training encoder alone, the decoder gets weights=0. 
+    #We must reinit decoder weights or reload network passing only encoder in order to train decoder
+    print("========== DECODER TRAINING ===========")
+    if (not args.state):
+        if args.pretrainedEncoder:
+            print("Loading encoder pretrained in imagenet")
+            from erfnet_imagenet import ERFNet as ERFNet_imagenet
+            pretrainedEnc = torch.nn.DataParallel(ERFNet_imagenet(1000))
+            pretrainedEnc.load_state_dict(torch.load(args.pretrainedEncoder)['state_dict'])
+            pretrainedEnc = next(pretrainedEnc.children()).features.encoder
+            if (not args.cuda):
+                pretrainedEnc = pretrainedEnc.cpu()     #because loaded encoder is probably saved in cuda
+        else:
+            pretrainedEnc = next(model.children()).encoder
+        model = model_file.Net(NUM_CLASSES, encoder=pretrainedEnc)  #Add decoder to encoder
+        if args.cuda:
+            model = torch.nn.DataParallel(model).cuda()
+        #When loading encoder reinitialize weights for decoder because they are set to 0 when training dec
+    model = train(args, model, False)   #Train decoder
     print("========== TRAINING FINISHED ===========")
 
 if __name__ == '__main__':
