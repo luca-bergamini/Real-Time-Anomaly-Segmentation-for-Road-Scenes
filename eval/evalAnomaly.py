@@ -13,6 +13,7 @@ from argparse import ArgumentParser
 from ood_metrics import fpr_at_95_tpr, calc_metrics, plot_roc, plot_pr,plot_barcode
 from sklearn.metrics import roc_auc_score, roc_curve, auc, precision_recall_curve, average_precision_score
 from torchvision.transforms import Compose, Resize, ToTensor
+import torch.nn.functional as F
 import sys
 
 seed = 42
@@ -117,6 +118,9 @@ def main():
 
         if args.method == 'Void':
             anomaly_result = -result[:, 19, :, :].cpu().numpy().squeeze()
+        elif args.method == 'VoidSoft':
+            anomaly_result = F.softmax(result, dim=1)[:, 19, :, :]
+            anomaly_result = anomaly_result.data.cpu().numpy().squeeze()
         elif args.method == 'MSP':
             softmax_probs = torch.nn.functional.softmax(result, dim=1)
             msp = torch.max(softmax_probs, dim=1)[0].cpu().numpy().squeeze()
