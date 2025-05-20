@@ -9,6 +9,7 @@ import torch.nn.functional as F
 import os
 import importlib
 import time
+import sys
 
 from PIL import Image
 from argparse import ArgumentParser
@@ -42,10 +43,29 @@ def main(args):
     modelpath = args.loadDir + args.loadModel
     weightspath = args.loadDir + args.loadWeights
 
-    print ("Loading model: " + modelpath)
-    print ("Loading weights: " + weightspath)
+    #print ("Loading model: " + modelpath)
+    #print ("Loading weights: " + weightspath)
 
-    model = ERFNet(NUM_CLASSES)
+    #model = ERFNet(NUM_CLASSES)
+    #model_file = importlib.import_module(args.loadModel[:-3])
+    
+    # Add the `train/` directory to sys.path
+    train_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "train"))
+    if train_dir not in sys.path:
+        sys.path.insert(0, train_dir)
+    
+    model_path = args.loadModel
+    model_name = "bisenet"
+
+    if not os.path.isabs(model_path):
+        # Convert to absolute path relative to current working directory
+        model_path = os.path.abspath(model_path)
+
+    spec = importlib.util.spec_from_file_location(model_name, model_path)
+    model_file = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(model_file)
+    
+    model = model_file.Net(NUM_CLASSES)
 
     #model = torch.nn.DataParallel(model)
     if (not args.cpu):
@@ -57,6 +77,8 @@ def main(args):
             if name not in own_state:
                 if name.startswith("module."):
                     own_state[name.split("module.")[-1]].copy_(param)
+                elif args.loadModel != "erfnet.py":
+                    own_state["module."+name].copy_(param)
                 else:
                     print(name, " not loaded")
                     continue
@@ -65,7 +87,7 @@ def main(args):
         return model
 
     model = load_my_state_dict(model, torch.load(weightspath, map_location=lambda storage, loc: storage))
-    print ("Model and weights LOADED successfully")
+    #print ("Model and weights LOADED successfully")
 
 
     model.eval()
@@ -77,7 +99,11 @@ def main(args):
     loader = DataLoader(cityscapes(args.datadir, input_transform_cityscapes, target_transform_cityscapes, subset=args.subset), num_workers=args.num_workers, batch_size=args.batch_size, shuffle=False)
 
 
-    iouEvalVal = iouEval(NUM_CLASSES)
+    #iouEvalVal = iouEval(NUM_CLASSES)
+    if args.void:
+        iouEvalVal = iouEval(NUM_CLASSES, 20)
+    else:
+        iouEvalVal = iouEval(NUM_CLASSES)
 
     start = time.time()
 
@@ -89,12 +115,15 @@ def main(args):
         inputs = Variable(images)
         with torch.no_grad():
             outputs = model(inputs)
+        
+        if os.path.splitext(os.path.basename(args.loadModel))[0] == "bisenet":
+            outputs = outputs[1]
 
         iouEvalVal.addBatch(outputs.max(1)[1].unsqueeze(1).data, labels)
 
         filenameSave = filename[0].split("leftImg8bit/")[1] 
 
-        print (step, filenameSave)
+        #print (step, filenameSave)
 
 
     iouVal, iou_classes = iouEvalVal.getIoU()
@@ -128,6 +157,8 @@ def main(args):
     print(iou_classes_str[16], "train")
     print(iou_classes_str[17], "motorcycle")
     print(iou_classes_str[18], "bicycle")
+    if args.void:
+        print(iou_classes_str[19], "void")
     print("=======================================")
     iouStr = getColorEntry(iouVal)+'{:0.2f}'.format(iouVal*100) + '\033[0m'
     print ("MEAN IoU: ", iouStr, "%")
@@ -145,5 +176,6 @@ if __name__ == '__main__':
     parser.add_argument('--num-workers', type=int, default=4)
     parser.add_argument('--batch-size', type=int, default=1)
     parser.add_argument('--cpu', action='store_true')
+    parser.add_argument('--void', action='store_true')
 
     main(parser.parse_args())
