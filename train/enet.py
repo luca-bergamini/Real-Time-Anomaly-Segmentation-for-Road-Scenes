@@ -1,4 +1,4 @@
-#ENet
+#ENet implementation based on the PyTorch repository https://github.com/davidtvs/PyTorch-ENet
 import torch.nn as nn
 import torch
 
@@ -465,7 +465,7 @@ class UpsamplingBottleneck(nn.Module):
         return self.out_activation(out)
 
 
-class ENet(nn.Module):
+class Net(nn.Module):
     """Generate the ENet model.
 
     Keyword arguments:

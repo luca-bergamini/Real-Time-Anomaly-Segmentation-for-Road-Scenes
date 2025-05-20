@@ -68,23 +68,7 @@ class MyCoTransform(object):
         target = ToLabel()(target)
         target = Relabel(255, 19)(target)
 
-        return input, target
-
-
-class ENetTransform(object):
-    def __init__(self, height=512, width=1024):
-        self.height = height
-        self.width = width
-    
-    def __call__(self, input, target):
-        input =  Resize(self.height, Image.BILINEAR)(input)
-        target = Resize(self.height, Image.NEAREST)(target)
-        
-        input = ToTensor()(input)
-        target = ToLabel()(target)
-        target = Relabel(255, 19)(target)
-        return input, target
-        
+        return input, target        
 
 class CrossEntropyLoss2d(torch.nn.Module):
 
@@ -143,6 +127,15 @@ def return_weights(enc):
     return weight
 
 def compute_weights(dataloader, num_classes, c=1.02):
+    """
+    Class weighting scheme proposed in the ENet paper:
+    A. Paszke et al., "ENet: A Deep Neural Network Architecture for Real-Time Semantic Segmentation", 2016.
+    
+    Formula: w_class = 1 / log(c + p_class)
+    where:
+        p_class = freq_class / total_pixels
+        c is a constant (default: 1.02)
+    """
     class_counts = torch.zeros(num_classes, dtype=torch.float64)
     total = 0
 
@@ -164,16 +157,10 @@ def train(args, model, enc=False):
     #TODO: calculate weights by processing dataset histogram (now its being set by hand from the torch values)
     #create a loder to run all images and calculate histogram of labels, then create weight array using class balancing
 
-
-
     assert os.path.exists(args.datadir), "Error: datadir (dataset directory) could not be loaded"
 
-    if args.model == "erfnet":
-        co_transform = MyCoTransform(enc, augment=True, height=args.height)#1024)
-        co_transform_val = MyCoTransform(enc, augment=False, height=args.height)#1024)
-    elif args.model == "enet":
-        co_transform = ENetTransform()
-        co_transform_val = ENetTransform()
+    co_transform = MyCoTransform(enc, augment=True, height=args.height)#1024)
+    co_transform_val = MyCoTransform(enc, augment=False, height=args.height)#1024)
 
     dataset_train = cityscapes(args.datadir, co_transform, 'train')
     dataset_val = cityscapes(args.datadir, co_transform_val, 'val')
@@ -183,6 +170,8 @@ def train(args, model, enc=False):
     
     #weight = return_weights(enc) #normal method
     weight = compute_weights(loader, NUM_CLASSES) #weight including the void class
+
+    """ # Module for saving weights
 
     # Select weights file based on model
     os.makedirs("./class_weights", exist_ok=True)
@@ -203,11 +192,12 @@ def train(args, model, enc=False):
     else:
         class_weights = np.load(weights_file)
     # Convert to torch tensor
-    class_weights = torch.from_numpy(class_weights).float()
-    if args.cuda:
-        class_weights = class_weights.cuda()
+    class_weights = torch.from_numpy(class_weights).float() """
 
-    criterion = CrossEntropyLoss2d(class_weights)
+    if args.cuda:
+        weight = weight.cuda()
+
+    criterion = CrossEntropyLoss2d(weight)
     print(type(criterion))
 
     savedir = args.savedir
@@ -487,11 +477,7 @@ def main(args):
     #Load Model
     assert os.path.exists(args.model + ".py"), "Error: model definition not found"
     model_file = importlib.import_module(args.model)
-
-    if args.model == "erfnet":
-        model = model_file.Net(NUM_CLASSES)
-    if args.model == "enet":
-        model = model_file.ENet(NUM_CLASSES)
+    model = model_file.Net(NUM_CLASSES)
     copyfile(args.model + ".py", savedir + '/' + args.model + ".py")
 
     if args.cuda:
@@ -546,8 +532,7 @@ def main(args):
     f.close()
     """
 
-    if args.model == "erfnet":
-        #train(args, model)
+    #train(args, model)
         if (not args.decoder):
             print("========== ENCODER TRAINING ===========")
             model = train(args, model, True) #Train encoder
