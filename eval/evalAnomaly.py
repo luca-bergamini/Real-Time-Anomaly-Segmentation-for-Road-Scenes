@@ -46,7 +46,7 @@ def main():
     parser.add_argument('--num-workers', type=int, default=4)
     parser.add_argument('--batch-size', type=int, default=1)
     parser.add_argument('--cpu', action='store_true')
-    parser.add_argument('--method', default='MSP', choices=['MSP', 'MaxLogit', 'MaxEntropy', 'Void', 'VoidSoft'],
+    parser.add_argument('--method', default='MSP', choices=['MSP', 'MaxLogit', 'MaxEntropy', 'Void'],
                     help="Choose OOD scoring method: MSP, MaxLogit, or MaxEntropy")
     args = parser.parse_args()
     anomaly_score_list = []
@@ -117,8 +117,6 @@ def main():
             result = result[0]
 
         if args.method == 'Void':
-            anomaly_result = -result[:, 19, :, :].cpu().numpy().squeeze()
-        elif args.method == 'VoidSoft':
             anomaly_result = F.softmax(result, dim=1)[:, 19, :, :]
             anomaly_result = anomaly_result.data.cpu().numpy().squeeze()
         elif args.method == 'MSP':
