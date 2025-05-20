@@ -84,50 +84,50 @@ class CrossEntropyLoss2d(torch.nn.Module):
 def return_weights(enc):
     weight = torch.ones(NUM_CLASSES)
     if (enc):
-        weight[0] = 2.3653597831726	
-        weight[1] = 4.4237880706787	
-        weight[2] = 2.9691488742828	
-        weight[3] = 5.3442072868347	
-        weight[4] = 5.2983593940735	
-        weight[5] = 5.2275490760803	
-        weight[6] = 5.4394111633301	
-        weight[7] = 5.3659925460815	
-        weight[8] = 3.4170460700989	
-        weight[9] = 5.2414722442627	
-        weight[10] = 4.7376127243042	
-        weight[11] = 5.2286224365234	
-        weight[12] = 5.455126285553	
-        weight[13] = 4.3019247055054	
-        weight[14] = 5.4264230728149	
-        weight[15] = 5.4331531524658	
-        weight[16] = 5.433765411377	
-        weight[17] = 5.4631009101868	
+        weight[0] = 2.3653597831726
+        weight[1] = 4.4237880706787
+        weight[2] = 2.9691488742828
+        weight[3] = 5.3442072868347
+        weight[4] = 5.2983593940735
+        weight[5] = 5.2275490760803
+        weight[6] = 5.4394111633301
+        weight[7] = 5.3659925460815
+        weight[8] = 3.4170460700989
+        weight[9] = 5.2414722442627
+        weight[10] = 4.7376127243042
+        weight[11] = 5.2286224365234
+        weight[12] = 5.455126285553
+        weight[13] = 4.3019247055054
+        weight[14] = 5.4264230728149
+        weight[15] = 5.4331531524658
+        weight[16] = 5.433765411377
+        weight[17] = 5.4631009101868
         weight[18] = 5.3947434425354
     else:
-        weight[0] = 2.8149201869965	
-        weight[1] = 6.9850029945374	
-        weight[2] = 3.7890393733978	
-        weight[3] = 9.9428062438965	
-        weight[4] = 9.7702074050903	
-        weight[5] = 9.5110931396484	
-        weight[6] = 10.311357498169	
-        weight[7] = 10.026463508606	
-        weight[8] = 4.6323022842407	
-        weight[9] = 9.5608062744141	
-        weight[10] = 7.8698215484619	
-        weight[11] = 9.5168733596802	
-        weight[12] = 10.373730659485	
-        weight[13] = 6.6616044044495	
-        weight[14] = 10.260489463806	
-        weight[15] = 10.287888526917	
-        weight[16] = 10.289801597595	
-        weight[17] = 10.405355453491	
-        weight[18] = 10.138095855713	
+        weight[0] = 2.8149201869965
+        weight[1] = 6.9850029945374
+        weight[2] = 3.7890393733978
+        weight[3] = 9.9428062438965
+        weight[4] = 9.7702074050903
+        weight[5] = 9.5110931396484
+        weight[6] = 10.311357498169
+        weight[7] = 10.026463508606
+        weight[8] = 4.6323022842407
+        weight[9] = 9.5608062744141
+        weight[10] = 7.8698215484619
+        weight[11] = 9.5168733596802
+        weight[12] = 10.373730659485
+        weight[13] = 6.6616044044495
+        weight[14] = 10.260489463806
+        weight[15] = 10.287888526917
+        weight[16] = 10.289801597595
+        weight[17] = 10.405355453491
+        weight[18] = 10.138095855713
 
     weight[19] = 0
     return weight
 
-def compute_weights(dataloader, num_classes, c=1.02):
+""" def compute_weights(dataloader, num_classes, c=1.02):
     class_counts = torch.zeros(num_classes, dtype=torch.float64)
     total = 0
 
@@ -140,7 +140,25 @@ def compute_weights(dataloader, num_classes, c=1.02):
     propensity_score = class_counts / total
     class_weights = 1.0 / torch.log(c + propensity_score)
 
-    return class_weights.float()
+    return class_weights.float() """
+    
+def compute_void_weight(dataloader, void_class=19, c=1.02):
+    void_count = 0
+    total = 0
+
+    for _, labels in dataloader:
+        labels = labels.view(-1)
+        void_count += (labels == void_class).sum().item()
+        total += labels.numel()
+
+    if void_count == 0:
+        raise ValueError("Void class not found in dataset.")
+
+    void_propensity = void_count / total
+    void_weight = 1.0 / torch.log(torch.tensor(c + void_propensity))
+
+    return void_weight.float()
+
 
 
 def train(args, model, enc=False):
@@ -160,7 +178,11 @@ def train(args, model, enc=False):
     loader_val = DataLoader(dataset_val, num_workers=args.num_workers, batch_size=args.batch_size, shuffle=False)
     
     #weight = return_weights(enc) #normal method
-    weight = compute_weights(loader, NUM_CLASSES) #weight including the void class
+    #weight = compute_weights(loader, NUM_CLASSES) #weight including the void class
+    
+    void_weight = compute_void_weight(loader)
+    weight = return_weights(enc).clone()
+    weight[19] = void_weight
 
     if args.cuda:
         weight = weight.cuda()
@@ -265,10 +287,7 @@ def train(args, model, enc=False):
             loss.backward()
             optimizer.step()
 
-            if args.model == "bisenet":
-                epoch_loss.append(loss.item())
-            else:
-                epoch_loss.append(loss.data[0])
+            epoch_loss.append(loss.item())
 
             time_train.append(time.time() - start_time)
 
@@ -333,11 +352,8 @@ def train(args, model, enc=False):
 
             loss = criterion(outputs, targets[:, 0])
             
-            if args.model == "bisenet":
-                epoch_loss.append(loss.item())
-                epoch_loss_val.append(loss.item())
-            else:
-                epoch_loss.append(loss.data[0])
+            epoch_loss.append(loss.item())
+            epoch_loss_val.append(loss.item())
                 
             time_val.append(time.time() - start_time)
 
