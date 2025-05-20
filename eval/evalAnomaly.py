@@ -112,7 +112,7 @@ def main():
         with torch.no_grad():
             result = model(images)
             
-        if args.loadModel == "bisenet.py":
+        if os.path.splitext(os.path.basename(args.loadModel))[0] == "bisenet":
             result = result[0]
 
         if args.method == 'Void':
