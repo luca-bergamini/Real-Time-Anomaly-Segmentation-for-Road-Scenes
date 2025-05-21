@@ -472,7 +472,7 @@ def main(args):
             return model
 
         #print(torch.load(args.state))
-        model = load_my_state_dict(model, torch.load(args.state))
+        model = load_my_state_dict(model, torch.load(args.state, weights_only=False))
 
     """
     def weights_init(m):
