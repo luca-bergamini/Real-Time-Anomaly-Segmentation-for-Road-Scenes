@@ -583,7 +583,7 @@ class Net(nn.Module):
             padding=1,
             bias=False)
 
-    def forward(self, x):
+    def forward(self, x, only_encode=False):
         # Initial block
         input_size = x.size()
         x = self.initial_block(x)
