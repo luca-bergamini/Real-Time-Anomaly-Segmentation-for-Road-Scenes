@@ -117,6 +117,7 @@ def main():
             result = result[0]
 
         if args.method == 'Void':
+            print("Shape di result:", result.shape)
             anomaly_result = F.softmax(result, dim=1)[:, 19, :, :]
             anomaly_result = anomaly_result.data.cpu().numpy().squeeze()
         elif args.method == 'MSP':
