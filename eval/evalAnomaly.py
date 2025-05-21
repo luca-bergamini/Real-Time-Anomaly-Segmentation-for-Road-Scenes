@@ -71,7 +71,7 @@ def main():
         sys.path.insert(0, train_dir)
     
     model_path = args.loadModel
-    model_name = "bisenet"
+    model_name = "enet"
 
     if not os.path.isabs(model_path):
         # Convert to absolute path relative to current working directory
@@ -113,7 +113,7 @@ def main():
         with torch.no_grad():
             result = model(images)
             
-        if os.path.splitext(os.path.basename(args.loadModel))[0] == "bisenet":
+        if os.path.splitext(os.path.basename(args.loadModel))[0] == "enet":
             result = result[0]
 
         if args.method == 'Void':
