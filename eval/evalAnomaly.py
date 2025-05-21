@@ -7,11 +7,14 @@ import random
 from PIL import Image
 import numpy as np
 from erfnet import ERFNet
+import importlib
 import os.path as osp
 from argparse import ArgumentParser
 from ood_metrics import fpr_at_95_tpr, calc_metrics, plot_roc, plot_pr,plot_barcode
 from sklearn.metrics import roc_auc_score, roc_curve, auc, precision_recall_curve, average_precision_score
 from torchvision.transforms import Compose, Resize, ToTensor
+import torch.nn.functional as F
+import sys
 
 seed = 42
 
@@ -43,7 +46,7 @@ def main():
     parser.add_argument('--num-workers', type=int, default=4)
     parser.add_argument('--batch-size', type=int, default=1)
     parser.add_argument('--cpu', action='store_true')
-    parser.add_argument('--method', default='MSP', choices=['MSP', 'MaxLogit', 'MaxEntropy'],
+    parser.add_argument('--method', default='MSP', choices=['MSP', 'MaxLogit', 'MaxEntropy', 'Void'],
                     help="Choose OOD scoring method: MSP, MaxLogit, or MaxEntropy")
     args = parser.parse_args()
     anomaly_score_list = []
@@ -59,7 +62,26 @@ def main():
     #print ("Loading model: " + modelpath)
     #print ("Loading weights: " + weightspath)
 
-    model = ERFNet(NUM_CLASSES)
+    #model_file = importlib.import_module(args.loadModel[:-3])
+    #model = ERFNet(NUM_CLASSES)
+    
+    # Add the `train/` directory to sys.path
+    train_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "train"))
+    if train_dir not in sys.path:
+        sys.path.insert(0, train_dir)
+    
+    model_path = args.loadModel
+    model_name = "bisenet"
+
+    if not os.path.isabs(model_path):
+        # Convert to absolute path relative to current working directory
+        model_path = os.path.abspath(model_path)
+
+    spec = importlib.util.spec_from_file_location(model_name, model_path)
+    model_file = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(model_file)
+    
+    model = model_file.Net(NUM_CLASSES)
 
     if (not args.cpu):
         model = torch.nn.DataParallel(model).cuda()
@@ -90,8 +112,14 @@ def main():
 
         with torch.no_grad():
             result = model(images)
+            
+        if os.path.splitext(os.path.basename(args.loadModel))[0] == "bisenet":
+            result = result[0]
 
-        if args.method == 'MSP':
+        if args.method == 'Void':
+            anomaly_result = F.softmax(result, dim=1)[:, 19, :, :]
+            anomaly_result = anomaly_result.data.cpu().numpy().squeeze()
+        elif args.method == 'MSP':
             softmax_probs = torch.nn.functional.softmax(result, dim=1)
             msp = torch.max(softmax_probs, dim=1)[0].cpu().numpy().squeeze()
             anomaly_result = 1.0 - msp
