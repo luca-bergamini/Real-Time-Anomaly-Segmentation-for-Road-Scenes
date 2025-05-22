@@ -76,10 +76,74 @@ class CrossEntropyLoss2d(torch.nn.Module):
     def __init__(self, weight=None):
         super().__init__()
 
-        self.loss = torch.nn.NLLLoss2d(weight)
+        self.loss = torch.nn.NLLLoss(weight)
 
     def forward(self, outputs, targets):
         return self.loss(torch.nn.functional.log_softmax(outputs, dim=1), targets)
+    
+def return_weights(enc):
+    weight = torch.ones(NUM_CLASSES)
+    if (enc):
+        weight[0] = 2.3653597831726
+        weight[1] = 4.4237880706787
+        weight[2] = 2.9691488742828
+        weight[3] = 5.3442072868347
+        weight[4] = 5.2983593940735
+        weight[5] = 5.2275490760803
+        weight[6] = 5.4394111633301
+        weight[7] = 5.3659925460815
+        weight[8] = 3.4170460700989
+        weight[9] = 5.2414722442627
+        weight[10] = 4.7376127243042
+        weight[11] = 5.2286224365234
+        weight[12] = 5.455126285553
+        weight[13] = 4.3019247055054
+        weight[14] = 5.4264230728149
+        weight[15] = 5.4331531524658
+        weight[16] = 5.433765411377
+        weight[17] = 5.4631009101868
+        weight[18] = 5.3947434425354
+    else:
+        weight[0] = 2.8149201869965
+        weight[1] = 6.9850029945374
+        weight[2] = 3.7890393733978
+        weight[3] = 9.9428062438965
+        weight[4] = 9.7702074050903
+        weight[5] = 9.5110931396484
+        weight[6] = 10.311357498169
+        weight[7] = 10.026463508606
+        weight[8] = 4.6323022842407
+        weight[9] = 9.5608062744141
+        weight[10] = 7.8698215484619
+        weight[11] = 9.5168733596802
+        weight[12] = 10.373730659485
+        weight[13] = 6.6616044044495
+        weight[14] = 10.260489463806
+        weight[15] = 10.287888526917
+        weight[16] = 10.289801597595
+        weight[17] = 10.405355453491
+        weight[18] = 10.138095855713
+
+    weight[19] = 0
+    return weight
+    
+def compute_void_weight(dataloader, void_class=19, c=1.02):
+    void_count = 0
+    total = 0
+
+    for _, labels in dataloader:
+        labels = labels.view(-1)
+        void_count += (labels == void_class).sum().item()
+        total += labels.numel()
+
+    if void_count == 0:
+        raise ValueError("Void class not found in dataset.")
+
+    void_propensity = void_count / total
+    void_weight = 1.0 / torch.log(torch.tensor(c + void_propensity))
+
+    return void_weight.float()
+
 
 
 def train(args, model, enc=False):
@@ -87,50 +151,6 @@ def train(args, model, enc=False):
 
     #TODO: calculate weights by processing dataset histogram (now its being set by hand from the torch values)
     #create a loder to run all images and calculate histogram of labels, then create weight array using class balancing
-
-    weight = torch.ones(NUM_CLASSES)
-    if (enc):
-        weight[0] = 2.3653597831726	
-        weight[1] = 4.4237880706787	
-        weight[2] = 2.9691488742828	
-        weight[3] = 5.3442072868347	
-        weight[4] = 5.2983593940735	
-        weight[5] = 5.2275490760803	
-        weight[6] = 5.4394111633301	
-        weight[7] = 5.3659925460815	
-        weight[8] = 3.4170460700989	
-        weight[9] = 5.2414722442627	
-        weight[10] = 4.7376127243042	
-        weight[11] = 5.2286224365234	
-        weight[12] = 5.455126285553	
-        weight[13] = 4.3019247055054	
-        weight[14] = 5.4264230728149	
-        weight[15] = 5.4331531524658	
-        weight[16] = 5.433765411377	
-        weight[17] = 5.4631009101868	
-        weight[18] = 5.3947434425354
-    else:
-        weight[0] = 2.8149201869965	
-        weight[1] = 6.9850029945374	
-        weight[2] = 3.7890393733978	
-        weight[3] = 9.9428062438965	
-        weight[4] = 9.7702074050903	
-        weight[5] = 9.5110931396484	
-        weight[6] = 10.311357498169	
-        weight[7] = 10.026463508606	
-        weight[8] = 4.6323022842407	
-        weight[9] = 9.5608062744141	
-        weight[10] = 7.8698215484619	
-        weight[11] = 9.5168733596802	
-        weight[12] = 10.373730659485	
-        weight[13] = 6.6616044044495	
-        weight[14] = 10.260489463806	
-        weight[15] = 10.287888526917	
-        weight[16] = 10.289801597595	
-        weight[17] = 10.405355453491	
-        weight[18] = 10.138095855713	
-
-    weight[19] = 0
 
     assert os.path.exists(args.datadir), "Error: datadir (dataset directory) could not be loaded"
 
@@ -141,13 +161,19 @@ def train(args, model, enc=False):
 
     loader = DataLoader(dataset_train, num_workers=args.num_workers, batch_size=args.batch_size, shuffle=True)
     loader_val = DataLoader(dataset_val, num_workers=args.num_workers, batch_size=args.batch_size, shuffle=False)
+    
+    #weight = return_weights(enc) #normal method
+    
+    void_weight = compute_void_weight(loader) #calculating weight for void class
+    weight = return_weights(enc).clone() #getting pre-computed weights
+    weight[19] = void_weight
 
     if args.cuda:
         weight = weight.cuda()
     criterion = CrossEntropyLoss2d(weight)
     print(type(criterion))
 
-    savedir = f'../save/{args.savedir}'
+    savedir = args.savedir
 
     if (enc):
         automated_log_path = savedir + "/automated_log_encoder.txt"
@@ -230,11 +256,23 @@ def train(args, model, enc=False):
             #print("targets", np.unique(targets[:, 0].cpu().data.numpy()))
 
             optimizer.zero_grad()
-            loss = criterion(outputs, targets[:, 0])
+            
+            if args.model == "bisenet":
+                main_out, aux1_out, aux2_out = outputs
+                loss = criterion(main_out, targets[:, 0]) \
+                    + 0.4 * criterion(aux1_out, targets[:, 0]) \
+                    + 0.4 * criterion(aux2_out, targets[:, 0])
+                outputs = outputs[0]
+            else:
+                loss = criterion(outputs, targets[:, 0])
+
+            #loss = criterion(outputs, targets[:, 0])
+            
             loss.backward()
             optimizer.step()
 
             epoch_loss.append(loss.item())
+
             time_train.append(time.time() - start_time)
 
             if (doIouTrain):
@@ -291,10 +329,16 @@ def train(args, model, enc=False):
 
             inputs = Variable(images, volatile=True)    #volatile flag makes it free backward or outputs for eval
             targets = Variable(labels, volatile=True)
-            outputs = model(inputs, only_encode=enc) 
+            outputs = model(inputs, only_encode=enc)
+            
+            if args.model == "bisenet":
+                outputs = outputs[0]
 
             loss = criterion(outputs, targets[:, 0])
+            
+            epoch_loss.append(loss.item())
             epoch_loss_val.append(loss.item())
+                
             time_val.append(time.time() - start_time)
 
 
@@ -389,7 +433,7 @@ def save_checkpoint(state, is_best, filenameCheckpoint, filenameBest):
 
 
 def main(args):
-    savedir = f'../save/{args.savedir}'
+    savedir = args.savedir
 
     if not os.path.exists(savedir):
         os.makedirs(savedir)
