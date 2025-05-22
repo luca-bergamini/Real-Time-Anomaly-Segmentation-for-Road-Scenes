@@ -9,7 +9,7 @@ import time
 import numpy as np
 import torch
 import math
-
+from tqdm import tqdm
 from PIL import Image, ImageOps
 from argparse import ArgumentParser
 
@@ -131,7 +131,7 @@ def compute_void_weight(dataloader, void_class=19, c=1.02):
     void_count = 0
     total = 0
 
-    for _, labels in dataloader:
+    for _, labels in tqdm(dataloader, desc="Computing void weight"):
         labels = labels.view(-1)
         void_count += (labels == void_class).sum().item()
         total += labels.numel()
