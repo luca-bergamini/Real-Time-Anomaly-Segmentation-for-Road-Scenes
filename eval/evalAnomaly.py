@@ -43,7 +43,7 @@ def main():
     parser.add_argument('--num-workers', type=int, default=4)
     parser.add_argument('--batch-size', type=int, default=1)
     parser.add_argument('--cpu', action='store_true')
-    parser.add_argument('--method', default='MSP', choices=['MSP', 'MaxLogit', 'MaxEntropy'],
+    parser.add_argument('--method', default='MSP',  choices=['MSP', 'MaxLogit', 'MaxEntropy', 'Void'],
                     help="Choose OOD scoring method: MSP, MaxLogit, or MaxEntropy")
     parser.add_argument('--temperature', type=float, default=1.0,
                     help="Temperature scaling for softmax/logit OOD scoring")
@@ -92,6 +92,10 @@ def main():
 
         with torch.no_grad():
             result = model(images)/ args.temperature
+
+        if args.method == 'Void':
+            anomaly_result = torch.nn.functional.softmax(result, dim=1)[:, 19, :, :]
+            anomaly_result = anomaly_result.data.cpu().numpy().squeeze()
 
         if args.method == 'MSP':
             softmax_probs = torch.nn.functional.softmax(result, dim=1)
