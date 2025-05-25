@@ -17,6 +17,7 @@ from torch.autograd import Variable
 from torch.utils.data import DataLoader
 from torchvision.transforms import Compose, CenterCrop, Normalize, Resize
 from torchvision.transforms import ToTensor, ToPILImage
+import torch.nn.utils.prune as prune
 
 from dataset import cityscapes
 from erfnet import ERFNet
@@ -67,6 +68,37 @@ def main(args):
     model = load_my_state_dict(model, torch.load(weightspath, map_location=lambda storage, loc: storage))
     #print ("Model and weights LOADED successfully")
 
+    def unstructured_prune_model(model, amount=0.3):
+        print(f"Applying unstructured L1 pruning with {amount * 100}% sparsity to Conv2d layers...")
+        for name, module in model.named_modules():
+            if isinstance(module, torch.nn.Conv2d):
+                prune.l1_unstructured(module, name='weight', amount=amount)
+                # Optional: remove pruning reparameterization so weights are actually pruned
+                prune.remove(module, 'weight')
+        return model
+    
+    def structured_prune_model(model, amount=0.3):
+        print(f"Applying structured pruning (L1 norm) with {amount*100}% sparsity to Conv2d output channels...")
+        for name, module in model.named_modules():
+            if isinstance(module, torch.nn.Conv2d):
+                try:
+                    prune.ln_structured(module, name='weight', amount=amount, n=1, dim=0)  # prune output channels
+                    prune.remove(module, 'weight')  # make pruning permanent
+                except Exception as e:
+                    print(f"Skipping {name}: {e}")
+        return model
+
+    if args.pruning_structured > 0:
+        model = structured_prune_model(model, amount=args.pruning_structured)
+    elif args.pruning_unstructured > 0:
+        model = unstructured_prune_model(model, amount=args.pruning_unstructured)
+    else:
+        print("No pruning applied.")
+
+    def count_parameters(model):
+        return sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+    print(f"Total parameters after structured pruning: {count_parameters(model)}")
 
     model.eval()
 
@@ -151,5 +183,7 @@ if __name__ == '__main__':
     parser.add_argument('--batch-size', type=int, default=1)
     parser.add_argument('--cpu', action='store_true')
     parser.add_argument('--void', action='store_true')
+    parser.add_argument('--pruning_structured', type=float, default=0.0, help="Amount of structured pruning (0 to disable)")
+    parser.add_argument('--pruning_unstructured', type=float, default=0.0, help="Amount of unstructured pruning (0 to disable)")
 
     main(parser.parse_args())
