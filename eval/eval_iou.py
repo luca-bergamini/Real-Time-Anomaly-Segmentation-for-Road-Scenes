@@ -81,7 +81,7 @@ def main(args):
     
 
     if args.pruning> 0:
-        model = prune_model(model, amount=args.pruning_structured)
+        model = prune_model(model, amount=args.pruning)
 
     def count_nonzero_parameters(model):
         total_params = 0
