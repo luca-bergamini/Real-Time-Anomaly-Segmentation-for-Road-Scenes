@@ -109,33 +109,35 @@ def main(args):
     else:
         iouEvalVal = iouEval(NUM_CLASSES)
 
-    start = time.time()
+    total_inference_time = 0.0
+    num_images = 0
 
     for step, (images, labels, filename, filenameGt) in enumerate(loader):
-        if (not args.cpu):
+        if not args.cpu:
             images = images.cuda()
             labels = labels.cuda()
 
         inputs = Variable(images)
+
+        if not args.cpu:
+            torch.cuda.synchronize()  # Make sure all CUDA ops are done before timing
+        start_infer = time.time()
+
         with torch.no_grad():
             outputs = model(inputs)
 
+        if not args.cpu:
+            torch.cuda.synchronize()  # Wait for GPU ops to finish
+
+        end_infer = time.time()
+        total_inference_time += (end_infer - start_infer)
+        num_images += images.size(0)  # count per-image even with batch_size > 1
+
         iouEvalVal.addBatch(outputs.max(1)[1].unsqueeze(1).data, labels)
 
-        filenameSave = filename[0].split("leftImg8bit/")[1] 
-
-        #print (step, filenameSave)
-
-
-    iouVal, iou_classes = iouEvalVal.getIoU()
-
-    iou_classes_str = []
-    for i in range(iou_classes.size(0)):
-        iouStr = getColorEntry(iou_classes[i])+'{:0.2f}'.format(iou_classes[i]*100) + '\033[0m'
-        iou_classes_str.append(iouStr)
-
-    print("---------------------------------------")
-    print("Took ", time.time()-start, "seconds")
+    print("=======================================")
+    print(f"Avg inference time per image: {total_inference_time / num_images:.4f} seconds")
+    print(f"Total inference time (model only): {total_inference_time:.2f} seconds for {num_images} images")
     print("=======================================")
     #print("TOTAL IOU: ", iou * 100, "%")
     print("Per-Class IoU:")
