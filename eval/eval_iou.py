@@ -95,10 +95,17 @@ def main(args):
     else:
         print("No pruning applied.")
 
-    def count_parameters(model):
-        return sum(p.numel() for p in model.parameters() if p.requires_grad)
+    def count_nonzero_parameters(model):
+        total_params = 0
+        nonzero_params = 0
+        for param in model.parameters():
+            total_params += param.numel()
+            nonzero_params += param.nonzero().size(0)
+        return total_params, nonzero_params
 
-    print(f"Total parameters after structured pruning: {count_parameters(model)}")
+    total, nonzero = count_nonzero_parameters(model)
+    print(f"Total parameters: {total} | Non-zero (effective) parameters after pruning: {nonzero}")
+    print(f"Pruned percentage: {(1 - nonzero / total) * 100:.2f}%")
 
     model.eval()
 
