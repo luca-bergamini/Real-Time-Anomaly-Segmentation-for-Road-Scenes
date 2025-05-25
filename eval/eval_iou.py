@@ -135,6 +135,13 @@ def main(args):
 
         iouEvalVal.addBatch(outputs.max(1)[1].unsqueeze(1).data, labels)
 
+    iouVal, iou_classes = iouEvalVal.getIoU()
+
+    iou_classes_str = []
+    for i in range(iou_classes.size(0)):
+        iouStr = getColorEntry(iou_classes[i])+'{:0.2f}'.format(iou_classes[i]*100) + '\033[0m'
+        iou_classes_str.append(iouStr)
+
     print("=======================================")
     print(f"Avg inference time per image: {total_inference_time / num_images:.4f} seconds")
     print(f"Total inference time (model only): {total_inference_time:.2f} seconds for {num_images} images")
