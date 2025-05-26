@@ -103,10 +103,9 @@ def main(args):
     total_flops = flop_analyzer.total()
     print(f"Total FLOPs: {total_flops / 1e9:.2f} GFLOPs")
 
-    # Theoretical time assuming T4's peak FP32 throughput (8.1 TFLOPs)
-    theoretical_t4_flops_per_sec = 8.1e12
-    theoretical_time = total_flops / theoretical_t4_flops_per_sec
-    print(f"Estimated time: {theoretical_time:.2f} seconds")
+    t4_flops_per_sec = 641.19e9  # 641 GFLOPS/s to match real inference time
+    theoretical_time_sec = total_flops / t4_flops_per_sec
+    print(f"Estimated time: {theoretical_time_sec:.6f} seconds")
 
     model.eval()
 
