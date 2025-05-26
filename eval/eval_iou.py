@@ -101,10 +101,15 @@ def main(args):
 
     flop_analyzer = FlopCountAnalysis(model_for_flops, dummy_input)
     total_flops = flop_analyzer.total()
-    print(f"Total FLOPs: {total_flops / 1e9:.2f} GFLOPs")
+
+    total_params, nonzero_params = count_nonzero_parameters(model)
+    sparsity_ratio = nonzero_params / total_params
+
+    effective_flops = total_flops * sparsity_ratio
+    print(f"Total FLOPs: {effective_flops / 1e9:.2f} GFLOPs")
 
     t4_flops_per_sec = 641.19e9  # 641 GFLOPS/s to match real inference time
-    theoretical_time_sec = total_flops / t4_flops_per_sec
+    theoretical_time_sec = effective_flops / t4_flops_per_sec
     print(f"Estimated time: {theoretical_time_sec:.6f} seconds")
 
     model.eval()
