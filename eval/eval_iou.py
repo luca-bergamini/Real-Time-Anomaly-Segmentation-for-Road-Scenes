@@ -99,16 +99,14 @@ def main(args):
     dummy_input = torch.randn(1, 3, 512, 1024).to(next(model.parameters()).device)
     model_for_flops = model.module if isinstance(model, torch.nn.DataParallel) else model
 
-    print("\nEstimating FLOPs and theoretical inference time...")
     flop_analyzer = FlopCountAnalysis(model_for_flops, dummy_input)
     total_flops = flop_analyzer.total()
-    print(f"Theoretical total FLOPs (for batch size 1): {total_flops:.2e}")
+    print(f"Total FLOPs: {total_flops / 1e9:.2f} GFLOPs")
 
-    # Adjust this according to your GPU (e.g., 15.7e12 = 15.7 TFLOPS for V100)
-    # Typical desktop GPU: 10 TFLOPS, CPU: ~100 GFLOPS (0.1e12)
-    hardware_flops_per_sec = 15.7e12 if not args.cpu else 100e9
-    theoretical_time_sec = total_flops / hardware_flops_per_sec
-    print(f"Estimated theoretical inference time (batch size 1): {theoretical_time_sec:.6f} sec")
+    # Theoretical time assuming T4's peak FP32 throughput (8.1 TFLOPs)
+    theoretical_t4_flops_per_sec = 8.1e12
+    theoretical_time = total_flops / theoretical_t4_flops_per_sec
+    print(f"Estimated time: {theoretical_time:.2f} seconds")
 
     model.eval()
 
