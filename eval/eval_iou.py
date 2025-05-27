@@ -69,8 +69,10 @@ def main(args):
     model = model_file.Net(NUM_CLASSES)
 
     #model = torch.nn.DataParallel(model)
-    if (not args.cpu):
+    if not args.cpu and not args.quantize:
         model = torch.nn.DataParallel(model).cuda()
+    elif args.quantize:
+        model.to('cpu')  # quantized model must stay on CPU
 
     def load_my_state_dict(model, state_dict):  #custom function to load model when not all dict elements
         own_state = model.state_dict()
