@@ -19,6 +19,7 @@ from torch.utils.data import DataLoader
 from torchvision.transforms import Compose, CenterCrop, Normalize, Resize
 from torchvision.transforms import ToTensor, ToPILImage
 from torch.quantization import quantize_dynamic
+from torch.ao.quantization import QConfig, default_observer, default_weight_observer
 
 from dataset import cityscapes
 from erfnet import ERFNet
@@ -95,7 +96,11 @@ def main(args):
     # ---------------- QUANTIZATION ----------------
     if args.quantize:
         # 1. Set the quantization config
-        model.qconfig = torch.quantization.get_default_qconfig('fbgemm')  # or 'qnnpack' for ARM/mobile
+        model.qconfig = QConfig(
+            activation=default_observer,                     # default: per_tensor_affine
+            weight=torch.quantization.default_per_tensor_weight_observer  # force per-tensor
+        )
+
 
         # 2. Prepare the model for static quantization
         torch.quantization.prepare(model, inplace=True)
