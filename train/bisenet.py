@@ -4,9 +4,6 @@ import torch.nn as nn
 from resnet import Resnet18
 
 from torch.nn import BatchNorm2d
-import torch.quantization
-
-
 
 class ConvBNReLU(nn.Module):
 
@@ -320,14 +317,6 @@ class Net(nn.Module):
                 wd_params += child_wd_params
                 nowd_params += child_nowd_params
         return wd_params, nowd_params, lr_mul_wd_params, lr_mul_nowd_params
-    
-    def fuse_model(self):
-        # Esempio per ResNet base
-        torch.quantization.fuse_modules(self, [['conv1', 'bn1', 'relu']], inplace=True)
-        for module in self.layer1:
-            torch.quantization.fuse_modules(module, [['conv1', 'bn1', 'relu'], ['conv2', 'bn2']], inplace=True)
-
-
 
 if __name__ == "__main__":
     net = Net(19)

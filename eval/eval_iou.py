@@ -18,7 +18,7 @@ from torch.autograd import Variable
 from torch.utils.data import DataLoader
 from torchvision.transforms import Compose, CenterCrop, Normalize, Resize
 from torchvision.transforms import ToTensor, ToPILImage
-from torch.ao.quantization import QConfig, default_observer, prepare, convert
+import torch.quantization
 
 from dataset import cityscapes
 from erfnet import ERFNet
@@ -69,11 +69,8 @@ def main(args):
     model = model_file.Net(NUM_CLASSES)
 
     #model = torch.nn.DataParallel(model)
-    if not args.cpu and not args.quantize:
+    if (not args.cpu):
         model = torch.nn.DataParallel(model).cuda()
-    elif args.quantize:
-        model.to('cpu')  # quantized model must stay on CPU
-
 
     def load_my_state_dict(model, state_dict):  #custom function to load model when not all dict elements
         own_state = model.state_dict()
@@ -97,35 +94,13 @@ def main(args):
 
     # ---------------- QUANTIZATION ----------------
     if args.quantize:
-        print("==> Quantizing the model...")
-
-        model.fuse_model()
+        # Dynamic quantization
         model.eval()
-        # 1. Set quantization config
-        model.qconfig = QConfig(
-            activation=default_observer.with_args(dtype=torch.quint8),
-            weight=default_observer.with_args(dtype=torch.qint8)
+        model = torch.quantization.quantize_dynamic(
+            model,
+            {torch.nn.Linear},  # only quantize Linear layers (Conv2d not supported dynamically)
+            dtype=torch.qint8
         )
-
-        # 2. Prepare model for static quantization
-        torch.quantization.prepare(model, inplace=True)
-
-        # 3. Calibrate using a few batches
-        model.eval()
-        model.cpu()  # move model to CPU for quantization
-        with torch.no_grad():
-            for i, (images, labels, _, _) in enumerate(loader):
-                images = images.cpu()  # inputs must be on CPU too
-                model(images)
-                if i >= 10:
-                    break
-
-        # 4. Convert to quantized model
-        torch.quantization.convert(model, inplace=True)
-        torch.save(model.state_dict(), "bisenet_quantized.pth")
-
-        print("==> Quantization complete. Saved to bisenet_quantized.pth.")
-        
     # ---------------- ENDING QUANTIZATION ----------------
 
     if(not os.path.exists(args.datadir)):
@@ -140,12 +115,9 @@ def main(args):
     start = time.time()
 
     for step, (images, labels, filename, filenameGt) in enumerate(loader):
-        if not args.cpu and not args.quantize:
+        if (not args.cpu):
             images = images.cuda()
             labels = labels.cuda()
-        elif args.quantize:
-            images = images.cpu()
-            labels = labels.cpu()
 
         inputs = Variable(images)
         with torch.no_grad():
