@@ -18,7 +18,10 @@ from torch.autograd import Variable
 from torch.utils.data import DataLoader
 from torchvision.transforms import Compose, CenterCrop, Normalize, Resize
 from torchvision.transforms import ToTensor, ToPILImage
-import torch.quantization
+#import torch.quantization
+from torch.quantization import get_default_qconfig
+from torch.ao.quantization import get_default_qconfig_mapping
+from torch.ao.quantization.quantize_fx import prepare_fx, convert_fx
 
 from dataset import cityscapes
 from erfnet import ERFNet
@@ -94,13 +97,41 @@ def main(args):
 
     # ---------------- QUANTIZATION ----------------
     if args.quantize:
-        # Dynamic quantization
+        """ # Dynamic quantization
         model.eval()
         model = torch.quantization.quantize_dynamic(
             model,
             {torch.nn.Linear},  # only quantize Linear layers (Conv2d not supported dynamically)
             dtype=torch.qint8
-        )
+        ) """
+        print("Preparing FX Graph Mode quantization...")
+
+        # Must run on CPU for quantization
+        model = model.cpu()
+        model.eval()
+
+        # Specify quantization config (static)
+        qconfig_mapping = get_default_qconfig_mapping("fbgemm")
+
+        # Dummy input (shape must match your training input)
+        example_inputs = torch.randn(1, 3, 512, 1024)
+
+        # FX prepare step: insert observers for calibration
+        model_prepared = prepare_fx(model, qconfig_mapping, example_inputs)
+
+        print("Calibrating model...")
+        # Calibrate the model using a few samples
+        with torch.no_grad():
+            for i, (images, labels, _, _) in enumerate(loader):
+                model_prepared(images.cpu())
+                if i >= 10:
+                    break
+
+        # Convert to quantized model
+        model_quantized = convert_fx(model_prepared)
+
+        print("Model quantized.")
+        model = model_quantized  # Replace model with quantized version
     # ---------------- ENDING QUANTIZATION ----------------
 
     if(not os.path.exists(args.datadir)):
