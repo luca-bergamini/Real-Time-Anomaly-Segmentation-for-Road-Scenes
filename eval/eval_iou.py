@@ -196,6 +196,6 @@ if __name__ == '__main__':
     parser.add_argument('--batch-size', type=int, default=1)
     parser.add_argument('--cpu', action='store_true')
     parser.add_argument('--void', action='store_true')
-    parser.add_argument('--quatize', action='store_true')
+    parser.add_argument('--quantize', action='store_true')
 
     main(parser.parse_args())
