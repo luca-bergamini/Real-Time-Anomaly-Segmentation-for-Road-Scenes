@@ -18,7 +18,7 @@ from torch.autograd import Variable
 from torch.utils.data import DataLoader
 from torchvision.transforms import Compose, CenterCrop, Normalize, Resize
 from torchvision.transforms import ToTensor, ToPILImage
-from torch.ao.quantization import QConfig, default_observer, default_weight_observer
+from torch.ao.quantization import QConfig, default_observer, prepare, convert
 
 from dataset import cityscapes
 from erfnet import ERFNet
@@ -94,6 +94,8 @@ def main(args):
 
     # ---------------- QUANTIZATION ----------------
     if args.quantize:
+        print("==> Quantizing the model...")
+
         # 1. Set the quantization config
         model.qconfig = QConfig(
             activation=default_observer.with_args(dtype=torch.quint8),
@@ -101,23 +103,28 @@ def main(args):
         )
 
         # 2. Prepare the model for static quantization
-        torch.quantization.prepare(model, inplace=True)
+        prepare(model, inplace=True)
 
         # 3. Calibrate the model using a few batches from the evaluation loader
         model.eval()
         with torch.no_grad():
             for i, (images, labels, _, _) in enumerate(loader):
-                if not args.cpu:
-                    images = images.cuda()
+                images = images.to('cpu')  # must be on CPU
                 model(images)
                 if i >= 10:  # Use first few batches to calibrate
                     break
 
         # 4. Convert the model to a quantized version
-        torch.quantization.convert(model, inplace=True)
+        convert(model, inplace=True)
+
+        # 5. Save the quantized model weights
         torch.save(model.state_dict(), "bisenet_quantized.pth")
-    
+
+    # Force model to run on CPU for quantized inference
     model.eval()
+    model.to('cpu')  # Quantized models must be run on CPU
+        
+    # ---------------- ENDING QUANTIZATION ----------------
 
     if(not os.path.exists(args.datadir)):
         print ("Error: datadir could not be loaded")
