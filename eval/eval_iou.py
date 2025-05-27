@@ -155,6 +155,9 @@ def main(args):
 
         with torch.no_grad():
             outputs = model(inputs)
+            
+        if os.path.splitext(os.path.basename(args.loadModel))[0] == "bisenet":
+            outputs = outputs[1]
 
         if not args.cpu:
             torch.cuda.synchronize()  # Wait for GPU ops to finish
