@@ -73,11 +73,6 @@ def main(args):
         model = torch.nn.DataParallel(model).cuda()
     elif args.quantize:
         model.to('cpu')  # quantized model must stay on CPU
-        
-    if args.quantize:
-        inputs = inputs.cpu()
-    else:
-        inputs = inputs.cuda()
 
 
     def load_my_state_dict(model, state_dict):  #custom function to load model when not all dict elements
@@ -143,9 +138,12 @@ def main(args):
     start = time.time()
 
     for step, (images, labels, filename, filenameGt) in enumerate(loader):
-        if (not args.cpu):
+        if not args.cpu and not args.quantize:
             images = images.cuda()
             labels = labels.cuda()
+        elif args.quantize:
+            images = images.cpu()
+            labels = labels.cpu()
 
         inputs = Variable(images)
         with torch.no_grad():
