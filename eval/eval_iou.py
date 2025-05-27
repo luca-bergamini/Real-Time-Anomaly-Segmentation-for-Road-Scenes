@@ -18,6 +18,7 @@ from torch.autograd import Variable
 from torch.utils.data import DataLoader
 from torchvision.transforms import Compose, CenterCrop, Normalize, Resize
 from torchvision.transforms import ToTensor, ToPILImage
+from torch.quantization import quantize_dynamic
 
 from dataset import cityscapes
 from erfnet import ERFNet
@@ -89,7 +90,28 @@ def main(args):
     model = load_my_state_dict(model, torch.load(weightspath, map_location=lambda storage, loc: storage))
     #print ("Model and weights LOADED successfully")
 
+    # ---------------- QUANTIZATION ----------------
+    if args.quantize:
+        # 1. Set the quantization config
+        model.qconfig = torch.quantization.get_default_qconfig('fbgemm')  # or 'qnnpack' for ARM/mobile
 
+        # 2. Prepare the model for static quantization
+        torch.quantization.prepare(model, inplace=True)
+
+        # 3. Calibrate the model using a few batches from the evaluation loader
+        model.eval()
+        with torch.no_grad():
+            for i, (images, labels, _, _) in enumerate(loader):
+                if not args.cpu:
+                    images = images.cuda()
+                model(images)
+                if i >= 10:  # Use first few batches to calibrate
+                    break
+
+        # 4. Convert the model to a quantized version
+        torch.quantization.convert(model, inplace=True)
+        torch.save(model.state_dict(), "bisenet_quantized.pth")
+    
     model.eval()
 
     if(not os.path.exists(args.datadir)):
@@ -177,5 +199,7 @@ if __name__ == '__main__':
     parser.add_argument('--batch-size', type=int, default=1)
     parser.add_argument('--cpu', action='store_true')
     parser.add_argument('--void', action='store_true')
+    parser.add_argument('--quantize', default=False)
+    
 
     main(parser.parse_args())
