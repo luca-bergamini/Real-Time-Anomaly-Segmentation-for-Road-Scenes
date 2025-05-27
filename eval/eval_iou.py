@@ -159,8 +159,13 @@ def main(args):
         with torch.no_grad():
             outputs = model(inputs)
         
-        if os.path.splitext(os.path.basename(args.loadModel))[0] == "bisenet":
-            outputs = outputs[1]
+        """ if os.path.splitext(os.path.basename(args.loadModel))[0] == "bisenet":
+            outputs = outputs[1] """
+        if isinstance(outputs, (list, tuple)):
+            print(f"Quantized model output list of length {len(outputs)}")
+            for i, o in enumerate(outputs):
+                print(f"Output[{i}]: shape={o.shape}")
+            outputs = outputs[1] if len(outputs) > 1 else outputs[0]
 
         iouEvalVal.addBatch(outputs.max(1)[1].unsqueeze(1).data, labels)
 
