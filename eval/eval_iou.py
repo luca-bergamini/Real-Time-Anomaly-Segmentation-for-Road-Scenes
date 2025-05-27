@@ -70,10 +70,7 @@ def main(args):
     model_file = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(model_file)
     
-    if model_name == "bisenet":
-        model = model_file.Net(NUM_CLASSES, aux_mode="eval")
-    else:
-        model = model_file.Net(NUM_CLASSES)
+    model = model_file.Net(NUM_CLASSES)
 
     #model = torch.nn.DataParallel(model)
     if (not args.cpu):
