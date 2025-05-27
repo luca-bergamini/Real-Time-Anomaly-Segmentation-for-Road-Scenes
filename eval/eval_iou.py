@@ -102,7 +102,8 @@ def main(args):
 
         # 3. Prepare your model for quantization - this inserts observers
         qconfig_dict = {"": qconfig}  # applies to all layers by default
-        model_prepared = prepare_fx(model, qconfig_dict)
+        example_inputs = torch.randn(1, 3, 512, 1024).cuda()  # or whatever input size your model expects
+        model_prepared = prepare_fx(model, qconfig_dict, example_inputs)
 
         # 4. Calibration step: run some data through the model to collect stats for quantization
         # Use a small calibration dataset or some batches from your training/validation set
