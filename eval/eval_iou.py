@@ -20,9 +20,8 @@ from torch.utils.data import DataLoader
 from torchvision.transforms import Compose, CenterCrop, Normalize, Resize
 from torchvision.transforms import ToTensor, ToPILImage
 #import torch.quantization
-from torch.quantization import get_default_qconfig
-from torch.ao.quantization import get_default_qconfig_mapping
 from torch.ao.quantization.quantize_fx import prepare_fx, convert_fx
+from torch.ao.quantization import get_default_qconfig
 
 from dataset import cityscapes
 from erfnet import ERFNet
@@ -70,7 +69,7 @@ def main(args):
     model_file = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(model_file)
     
-    model = model_file.Net(NUM_CLASSES)
+    model = model_file.Net(NUM_CLASSES, aux_model="eval")
 
     #model = torch.nn.DataParallel(model)
     if (not args.cpu):
@@ -98,43 +97,24 @@ def main(args):
 
     # ---------------- QUANTIZATION ----------------
     if args.quantize:
-        """ # Dynamic quantization
-        model.eval()
-        model = torch.quantization.quantize_dynamic(
-            model,
-            {torch.nn.Linear},  # only quantize Linear layers (Conv2d not supported dynamically)
-            dtype=torch.qint8
-        ) """
-        print("Preparing FX Graph Mode quantization...")
+        # 2. Set up qconfig - you can use default per-tensor symmetric quantization for weights and activations:
+        qconfig = get_default_qconfig('fbgemm')  # good backend for x86 CPUs
 
-        # Must run on CPU for quantization
-        model = model.cpu()
-        model.eval()
+        # 3. Prepare your model for quantization - this inserts observers
+        qconfig_dict = {"": qconfig}  # applies to all layers by default
+        model_prepared = prepare_fx(model, qconfig_dict)
 
-        # Specify quantization config (static)
-        qconfig_mapping = get_default_qconfig_mapping("fbgemm")
-
-        # Dummy input (shape must match your training input)
-        example_inputs = torch.randn(1, 3, 512, 1024)
-
-        # FX prepare step: insert observers for calibration
-        model_prepared = prepare_fx(model, qconfig_mapping, example_inputs)
-
-        print("Calibrating model...")
-        # Calibrate the model using a few samples
+        # 4. Calibration step: run some data through the model to collect stats for quantization
+        # Use a small calibration dataset or some batches from your training/validation set
+        calibration_data = torch.randn(8, 3, 640, 480).cuda()  # example dummy data
         with torch.no_grad():
-            for i, (images, labels, _, _) in enumerate(loader):
-                model_prepared(images.cpu())
-                if i >= 10:
-                    break
+            model_prepared(calibration_data)
 
-        # Convert to quantized model
+        # 5. Convert the model to a quantized model
         model_quantized = convert_fx(model_prepared)
-
-        print("Model quantized.")
-        model = model_quantized  # Replace model with quantized version
+        
+        model = model_quantized
         model.eval()
-        torch.save(model.state_dict(), "quantized_model.pth")
     # ---------------- ENDING QUANTIZATION ----------------
 
     if(not os.path.exists(args.datadir)):
