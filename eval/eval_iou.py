@@ -89,6 +89,8 @@ def main(args):
 
     model = load_my_state_dict(model, torch.load(weightspath, map_location=lambda storage, loc: storage))
     #print ("Model and weights LOADED successfully")
+    
+    loader = DataLoader(cityscapes(args.datadir, input_transform_cityscapes, target_transform_cityscapes, subset=args.subset), num_workers=args.num_workers, batch_size=args.batch_size, shuffle=False)
 
     # ---------------- QUANTIZATION ----------------
     if args.quantize:
@@ -117,10 +119,6 @@ def main(args):
     if(not os.path.exists(args.datadir)):
         print ("Error: datadir could not be loaded")
 
-
-    loader = DataLoader(cityscapes(args.datadir, input_transform_cityscapes, target_transform_cityscapes, subset=args.subset), num_workers=args.num_workers, batch_size=args.batch_size, shuffle=False)
-
-
     #iouEvalVal = iouEval(NUM_CLASSES)
     if args.void:
         iouEvalVal = iouEval(NUM_CLASSES, 20)
@@ -146,8 +144,7 @@ def main(args):
         filenameSave = filename[0].split("leftImg8bit/")[1] 
 
         #print (step, filenameSave)
-
-
+        
     iouVal, iou_classes = iouEvalVal.getIoU()
 
     iou_classes_str = []
@@ -199,7 +196,6 @@ if __name__ == '__main__':
     parser.add_argument('--batch-size', type=int, default=1)
     parser.add_argument('--cpu', action='store_true')
     parser.add_argument('--void', action='store_true')
-    parser.add_argument('--quantize', default=False)
-    
+    parser.add_argument('--quatize', action='store_true')
 
     main(parser.parse_args())
