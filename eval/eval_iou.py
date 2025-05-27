@@ -73,6 +73,12 @@ def main(args):
         model = torch.nn.DataParallel(model).cuda()
     elif args.quantize:
         model.to('cpu')  # quantized model must stay on CPU
+        
+    if args.quantize:
+        inputs = inputs.cpu()
+    else:
+        inputs = inputs.cuda()
+
 
     def load_my_state_dict(model, state_dict):  #custom function to load model when not all dict elements
         own_state = model.state_dict()
@@ -98,33 +104,30 @@ def main(args):
     if args.quantize:
         print("==> Quantizing the model...")
 
-        # 1. Set the quantization config
+        # 1. Set quantization config
         model.qconfig = QConfig(
             activation=default_observer.with_args(dtype=torch.quint8),
             weight=default_observer.with_args(dtype=torch.qint8)
         )
 
-        # 2. Prepare the model for static quantization
-        prepare(model, inplace=True)
+        # 2. Prepare model for static quantization
+        torch.quantization.prepare(model, inplace=True)
 
-        # 3. Calibrate the model using a few batches from the evaluation loader
+        # 3. Calibrate using a few batches
         model.eval()
+        model.cpu()  # move model to CPU for quantization
         with torch.no_grad():
             for i, (images, labels, _, _) in enumerate(loader):
-                images = images.to('cpu')  # must be on CPU
+                images = images.cpu()  # inputs must be on CPU too
                 model(images)
-                if i >= 10:  # Use first few batches to calibrate
+                if i >= 10:
                     break
 
-        # 4. Convert the model to a quantized version
-        convert(model, inplace=True)
-
-        # 5. Save the quantized model weights
+        # 4. Convert to quantized model
+        torch.quantization.convert(model, inplace=True)
         torch.save(model.state_dict(), "bisenet_quantized.pth")
 
-    # Force model to run on CPU for quantized inference
-    model.eval()
-    model.to('cpu')  # Quantized models must be run on CPU
+        print("==> Quantization complete. Saved to bisenet_quantized.pth.")
         
     # ---------------- ENDING QUANTIZATION ----------------
 
