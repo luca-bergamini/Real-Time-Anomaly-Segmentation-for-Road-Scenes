@@ -132,6 +132,7 @@ def main(args):
 
         print("Model quantized.")
         model = model_quantized  # Replace model with quantized version
+        torch.save(model.state_dict(), "quantized_model.pth")
     # ---------------- ENDING QUANTIZATION ----------------
 
     if(not os.path.exists(args.datadir)):
@@ -149,6 +150,9 @@ def main(args):
         if (not args.cpu):
             images = images.cuda()
             labels = labels.cuda()
+        else:
+            images = images.cpu()
+            labels = labels.cpu()
 
         inputs = Variable(images)
         with torch.no_grad():
