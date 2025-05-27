@@ -76,7 +76,7 @@ def main(args):
         print(f"Applying unstructured L1 pruning with {amount * 100}% sparsity to Conv2d layers...")
         for name, module in model.named_modules():
             if isinstance(module, torch.nn.Conv2d):
-                prune.ln_structured(module, name='weight', amount=amount, n=2, dim=0)   # L2 norm pruning
+                prune.l1_unstructured(module, name='weight', amount=amount)
                 # Optional: remove pruning reparameterization so weights are actually pruned
                 prune.remove(module, 'weight')
         return model
