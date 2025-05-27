@@ -132,6 +132,7 @@ def main(args):
 
         print("Model quantized.")
         model = model_quantized  # Replace model with quantized version
+        model.eval()
         torch.save(model.state_dict(), "quantized_model.pth")
     # ---------------- ENDING QUANTIZATION ----------------
 
