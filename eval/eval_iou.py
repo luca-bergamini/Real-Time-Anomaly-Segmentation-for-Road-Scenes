@@ -99,6 +99,8 @@ def main(args):
     if args.quantize:
         print("==> Quantizing the model...")
 
+        model.fuse_model()
+        model.eval()
         # 1. Set quantization config
         model.qconfig = QConfig(
             activation=default_observer.with_args(dtype=torch.quint8),
