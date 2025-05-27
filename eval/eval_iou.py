@@ -10,6 +10,7 @@ import os
 import importlib
 import time
 import sys
+from tqdm import tqdm
 
 from PIL import Image
 from argparse import ArgumentParser
@@ -147,7 +148,7 @@ def main(args):
 
     start = time.time()
 
-    for step, (images, labels, filename, filenameGt) in enumerate(loader):
+    for step, (images, labels, filename, filenameGt) in enumerate(tqdm(loader, desc="Evaluating")):
         if (not args.cpu):
             images = images.cuda()
             labels = labels.cuda()
@@ -161,8 +162,6 @@ def main(args):
         
         if isinstance(outputs, (list, tuple)):
             outputs = outputs[1] if len(outputs) > 1 else outputs[0]
-        
-        print("ended outputs..")
 
         iouEvalVal.addBatch(outputs.max(1)[1].unsqueeze(1).data, labels)
 
@@ -173,7 +172,7 @@ def main(args):
     iouVal, iou_classes = iouEvalVal.getIoU()
 
     iou_classes_str = []
-    for i in range(iou_classes.size(0)):
+    for i in tqdm(range(iou_classes.size(0)), desc="Processing IoU classes"):
         iouStr = getColorEntry(iou_classes[i])+'{:0.2f}'.format(iou_classes[i]*100) + '\033[0m'
         iou_classes_str.append(iouStr)
 
