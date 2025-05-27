@@ -139,7 +139,8 @@ def main(args):
     else:
         iouEvalVal = iouEval(NUM_CLASSES)
 
-    start = time.time()
+    total_inference_time = 0.0
+    num_images = 0
 
     for step, (images, labels, filename, filenameGt) in enumerate(tqdm(loader)):
         if not args.cpu:
