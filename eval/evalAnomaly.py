@@ -13,6 +13,7 @@ from ood_metrics import fpr_at_95_tpr, calc_metrics, plot_roc, plot_pr,plot_barc
 from sklearn.metrics import roc_auc_score, roc_curve, auc, precision_recall_curve, average_precision_score
 from torchvision.transforms import Compose, Resize, ToTensor
 import torch.nn.functional as F
+from torch.ao.quantization import get_default_qconfig_mapping, prepare_fx, convert_fx
 import sys
 
 seed = 42
@@ -47,6 +48,7 @@ def main():
     parser.add_argument('--cpu', action='store_true')
     parser.add_argument('--method', default='MSP', choices=['MSP', 'MaxLogit', 'MaxEntropy', 'Void'],
                     help="Choose OOD scoring method: MSP, MaxLogit, or MaxEntropy")
+    parser.add_argument('--quantize', action='store_true')
     args = parser.parse_args()
     anomaly_score_list = []
     ood_gts_list = []
@@ -107,6 +109,39 @@ def main():
 
     image_transform = Compose([Resize((512, 1024), Image.BILINEAR), ToTensor()])
     target_transform = Compose([Resize((512, 1024), Image.NEAREST)])
+    image_paths = glob.glob(os.path.expanduser(str(args.input[0])))
+    
+    # ---------------- QUANTIZATION ----------------
+    if args.quantize:
+        print("Preparing FX Graph Mode quantization...")
+
+        # Use CPU for quantization
+        model = model.cpu()
+        model.eval()
+
+        # Static quantization configuration
+        qconfig_mapping = get_default_qconfig_mapping("fbgemm")
+        example_inputs = torch.randn(1, 3, 512, 1024)
+
+        # Prepare the model for calibration
+        model_prepared = prepare_fx(model, qconfig_mapping, example_inputs)
+
+        print("Calibrating model...")
+
+        with torch.no_grad():
+            for i, path in enumerate(image_paths):
+                image = image_transform((Image.open(path).convert('RGB'))).unsqueeze(0)
+                model_prepared(image)
+                if i >= 10:  # Use a few images for calibration
+                    break
+
+        # Convert to quantized model
+        model_quantized = convert_fx(model_prepared)
+
+        print("Model quantized.")
+        model = model_quantized
+        torch.save(model.state_dict(), "quantized_model_anomaly.pth")
+    # ---------------- ENDING QUANTIZATION ----------------
     
     for path in glob.glob(os.path.expanduser(str(args.input[0]))):
 
