@@ -2,6 +2,9 @@
 import torch.nn as nn
 import torch
 
+def is_tracing():
+    """Check if the current execution is a tracing one."""
+    return torch._C._get_tracing_state() is not None
 
 class InitialBlock(nn.Module):
     """The initial block is composed of two branches:
@@ -332,15 +335,17 @@ class DownsamplingBottleneck(nn.Module):
         # Main branch channel padding
         n, ch_ext, h, w = ext.size()
         ch_main = main.size()[1]
-        padding = torch.zeros(n, ch_ext - ch_main, h, w)
+        pad_channels = ch_ext - ch_main
 
-        # Before concatenating, check if main is on the CPU or GPU and
-        # convert padding accordingly
-        if main.is_cuda:
-            padding = padding.cuda()
-
-        # Concatenate
-        main = torch.cat((main, padding), 1)
+        if is_tracing():
+            # If we are tracing, we need to pad with zeros
+            padding = torch.zeros((n, pad_channels, h, w), device=main.device, dtype=main.dtype)
+        else:
+            if pad_channels > 0:
+                padding = torch.zeros((n, pad_channels, h, w), device=main.device, dtype=main.dtype)
+                main = torch.cat((main, padding), dim=1)
+            elif pad_channels < 0:
+                main = main[:, :ch_ext, :, :]
 
         # Add main and extension branches
         out = main + ext
@@ -629,3 +634,4 @@ class Net(nn.Module):
         x = self.transposed_conv(x, output_size=input_size)
 
         return x
+    
