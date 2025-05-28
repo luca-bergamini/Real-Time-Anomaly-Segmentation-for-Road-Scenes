@@ -2,9 +2,6 @@
 import torch.nn as nn
 import torch
 
-def is_tracing():
-    """Check if the current execution is a tracing one."""
-    return torch._C._get_tracing_state() is not None
 
 class InitialBlock(nn.Module):
     """The initial block is composed of two branches:
@@ -335,15 +332,20 @@ class DownsamplingBottleneck(nn.Module):
         # Main branch channel padding
         n, ch_ext, h, w = ext.size()
         ch_main = main.size()[1]
+        padding = torch.zeros(n, ch_ext - ch_main, h, w)
 
-        main = torch.nn.functional.pad(main, (0, 0, 0, 0, 0, ch_ext - ch_main))
+        # Before concatenating, check if main is on the CPU or GPU and
+        # convert padding accordingly
+        if main.is_cuda:
+            padding = padding.cuda()
 
+        # Concatenate
+        main = torch.cat((main, padding), 1)
+
+        # Add main and extension branches
         out = main + ext
 
-        if self.return_indices:
-            return self.out_activation(out), max_indices
-        else:
-            return self.out_activation(out)
+        return self.out_activation(out), max_indices
 
 
 class UpsamplingBottleneck(nn.Module):
@@ -625,6 +627,3 @@ class Net(nn.Module):
         x = self.upsample5_0(x, max_indices1_0, output_size=stage1_input_size)
         x = self.regular5_1(x)
         x = self.transposed_conv(x, output_size=input_size)
-
-        return x
-    
