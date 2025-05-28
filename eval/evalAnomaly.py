@@ -146,8 +146,13 @@ def main():
     
     for path in glob.glob(os.path.expanduser(str(args.input[0]))):
 
-        images = image_transform((Image.open(path).convert('RGB'))).unsqueeze(0).float().cuda()
+        image_tensor = image_transform((Image.open(path).convert('RGB'))).unsqueeze(0).float()
 
+        if args.cpu:
+            images = image_tensor.cpu()
+        else:
+            images = image_tensor.cuda()
+        
         with torch.no_grad():
             result = model(images)
             
