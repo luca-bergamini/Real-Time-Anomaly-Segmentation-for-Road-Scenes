@@ -10,6 +10,7 @@ import os
 import importlib
 import time
 import sys
+from tqdm import tqdm
 
 from PIL import Image
 from argparse import ArgumentParser
@@ -19,7 +20,9 @@ from torch.utils.data import DataLoader
 from torchvision.transforms import Compose, CenterCrop, Normalize, Resize
 from torchvision.transforms import ToTensor, ToPILImage
 import torch.nn.utils.prune as prune
-from tqdm import tqdm
+from torch.quantization import get_default_qconfig
+from torch.ao.quantization import get_default_qconfig_mapping
+from torch.ao.quantization.quantize_fx import prepare_fx, convert_fx
 
 from dataset import cityscapes
 from erfnet import ERFNet
@@ -72,6 +75,8 @@ def main(args):
     model = load_my_state_dict(model, torch.load(weightspath, map_location=lambda storage, loc: storage))
     #print ("Model and weights LOADED successfully")
 
+     # ---------------- PRUNING ----------------
+
     def prune_model(model, amount=0.3):
         print(f"Applying unstructured L1 pruning with {amount * 100}% sparsity to Conv2d layers...")
         for name, module in model.named_modules():
@@ -80,7 +85,6 @@ def main(args):
                 # Optional: remove pruning reparameterization so weights are actually pruned
                 prune.remove(module, 'weight')
         return model
-    
 
     if args.pruning> 0:
         model = prune_model(model, amount=args.pruning)
@@ -114,13 +118,45 @@ def main(args):
     theoretical_time_sec = effective_flops / t4_flops_per_sec
     print(f"Estimated time: {theoretical_time_sec:.6f} seconds")
 
-    model.eval()
+
+    loader = DataLoader(cityscapes(args.datadir, input_transform_cityscapes, target_transform_cityscapes, subset=args.subset), num_workers=args.num_workers, batch_size=args.batch_size, shuffle=False)
+    
+    # ---------------- QUANTIZATION ----------------
+    if args.quantize:
+        print("Preparing FX Graph Mode quantization...")
+
+        # Must run on CPU for quantization
+        model = model.cpu()
+        model.eval()
+
+        # Specify quantization config (static)
+        qconfig_mapping = get_default_qconfig_mapping("fbgemm")
+
+        # Dummy input (shape must match your training input)
+        example_inputs = torch.randn(1, 3, 512, 1024)
+
+        # FX prepare step: insert observers for calibration
+        model_prepared = prepare_fx(model, qconfig_mapping, example_inputs)
+
+        print("Calibrating model...")
+        # Calibrate the model using a few samples
+        with torch.no_grad():
+            for i, (images, labels, _, _) in enumerate(loader):
+                model_prepared(images.cpu())
+                if i >= 10:
+                    break
+
+        # Convert to quantized model
+        model_quantized = convert_fx(model_prepared)
+
+        print("Model quantized.")
+        model = model_quantized  # Replace model with quantized version
+        model.eval()
+        torch.save(model.state_dict(), "quantized_model.pth")
+    # ---------------- ENDING QUANTIZATION ----------------
 
     if(not os.path.exists(args.datadir)):
         print ("Error: datadir could not be loaded")
-
-
-    loader = DataLoader(cityscapes(args.datadir, input_transform_cityscapes, target_transform_cityscapes, subset=args.subset), num_workers=args.num_workers, batch_size=args.batch_size, shuffle=False)
 
 
     if args.void:
