@@ -243,5 +243,6 @@ if __name__ == '__main__':
     parser.add_argument('--cpu', action='store_true')
     parser.add_argument('--void', action='store_true')
     parser.add_argument('--pruning', type=float, default=0.0, help="Amount of structured pruning (0 to disable)")
+    parser.add_argument('--quantize', action='store_true')
 
     main(parser.parse_args())
