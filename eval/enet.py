@@ -624,7 +624,7 @@ class Net(nn.Module):
         # Stage 5 - Decoder
         x = self.upsample5_0(x, max_indices1_0, output_size=stage1_input_size)
         x = self.regular5_1(x)
-        x = self.transposed_conv(x, output_size=input_size)
+        x = self.transposed_conv(x)
 
         return x
     
