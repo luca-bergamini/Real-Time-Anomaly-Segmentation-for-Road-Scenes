@@ -13,7 +13,7 @@ from ood_metrics import fpr_at_95_tpr, calc_metrics, plot_roc, plot_pr,plot_barc
 from sklearn.metrics import roc_auc_score, roc_curve, auc, precision_recall_curve, average_precision_score
 from torchvision.transforms import Compose, Resize, ToTensor
 import torch.nn.functional as F
-from torch.ao.quantization import get_default_qconfig_mapping
+from torch.ao.quantization import get_default_qconfig, QConfigMapping, MinMaxObserver, PerChannelMinMaxObserver
 from torch.ao.quantization.quantize_fx import prepare_fx, convert_fx
 import sys
 
@@ -121,7 +121,12 @@ def main():
         model.eval()
 
         # Static quantization configuration
-        qconfig_mapping = get_default_qconfig_mapping("fbgemm")
+        qconfig = torch.ao.quantization.QConfig(
+            activation=MinMaxObserver.with_args(quant_min=0, quant_max=255),
+            weight=PerChannelMinMaxObserver.with_args(quant_min=-128, quant_max=127)
+        )
+
+        qconfig_mapping = QConfigMapping().set_global(qconfig)
         example_inputs = torch.randn(1, 3, 512, 1024)
 
         # Prepare the model for calibration
