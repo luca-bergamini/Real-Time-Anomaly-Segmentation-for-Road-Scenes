@@ -17,6 +17,7 @@ from torch.ao.quantization import QConfigMapping, QConfig, get_default_qat_qconf
 from torch.ao.quantization.observer import MinMaxObserver, PerChannelMinMaxObserver, FixedQParamsObserver
 from torch.ao.quantization.quantize_fx import prepare_fx, convert_fx
 import sys
+import time
 
 seed = 42
 
@@ -154,6 +155,9 @@ def main():
         torch.save(model.state_dict(), "quantized_model_anomaly.pth")
     # ---------------- ENDING QUANTIZATION ----------------
     
+    total_inference_time = 0.0
+    num_images = 0
+    
     for path in glob.glob(os.path.expanduser(str(args.input[0]))):
 
         image_tensor = image_transform((Image.open(path).convert('RGB'))).unsqueeze(0).float()
@@ -162,9 +166,21 @@ def main():
             images = image_tensor.cpu()
         else:
             images = image_tensor.cuda()
+            
+        if not args.cpu:
+            torch.cuda.synchronize()  # Ensure all GPU ops are done before timing
+            
+        start_infer = time.time()
         
         with torch.no_grad():
             result = model(images)
+            
+        if not args.cpu:
+            torch.cuda.synchronize()  # Wait for GPU ops to finish
+
+        end_infer = time.time()
+        total_inference_time += (end_infer - start_infer)
+        num_images += 1
             
         if os.path.splitext(os.path.basename(args.loadModel))[0] == "bisenet":
             result = result[0]
@@ -217,6 +233,13 @@ def main():
              anomaly_score_list.append(anomaly_result)
         del result, anomaly_result, ood_gts, mask
         torch.cuda.empty_cache()
+        
+    if num_images > 0:
+        avg_infer_time = total_inference_time / num_images
+        print("=======================================")
+        print(f"Avg inference time per image: {avg_infer_time:.4f} seconds")
+        print(f"Total inference time (model only): {total_inference_time:.2f} seconds for {num_images} images")
+        print("=======================================")
 
     file.write( "\n")
 
