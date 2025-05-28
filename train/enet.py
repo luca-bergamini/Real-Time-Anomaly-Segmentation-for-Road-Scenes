@@ -332,7 +332,12 @@ class DownsamplingBottleneck(nn.Module):
         # Main branch channel padding
         n, ch_ext, h, w = ext.size()
         ch_main = main.size()[1]
-        padding = ext.new_zeros(n, ch_ext - ch_main, h, w)
+        padding = torch.zeros(n, ch_ext - ch_main, h, w)
+
+        # Before concatenating, check if main is on the CPU or GPU and
+        # convert padding accordingly
+        if main.is_cuda:
+            padding = padding.cuda()
 
         # Concatenate
         main = torch.cat((main, padding), 1)
@@ -440,19 +445,15 @@ class UpsamplingBottleneck(nn.Module):
         # PReLU layer to apply after concatenating the branches
         self.out_activation = activation()
 
-    def set_unpool_params(self, max_indices, output_size):
-        self._max_indices = max_indices
-        self._output_size = output_size    
-
-    def forward(self, x):
+    def forward(self, x, max_indices, output_size):
         # Main branch shortcut
         main = self.main_conv1(x)
         main = self.main_unpool1(
-            main, self._max_indices, output_size=self._output_size)
+            main, max_indices, output_size=output_size)
 
         # Extension branch
         ext = self.ext_conv1(x)
-        ext = self.ext_tconv1(ext, output_size=self._output_size)
+        ext = self.ext_tconv1(ext, output_size=output_size)
         ext = self.ext_tconv1_bnorm(ext)
         ext = self.ext_tconv1_activation(ext)
         ext = self.ext_conv2(ext)
@@ -618,15 +619,13 @@ class Net(nn.Module):
         x = self.dilated3_7(x)
 
         # Stage 4 - Decoder
-        self.upsample4_0.set_unpool_params(max_indices2_0, stage2_input_size)
-        x = self.upsample4_0(x)
+        x = self.upsample4_0(x, max_indices2_0, output_size=stage2_input_size)
         x = self.regular4_1(x)
         x = self.regular4_2(x)
 
         # Stage 5 - Decoder
-        self.upsample5_0.set_unpool_params(max_indices1_0, stage1_input_size)
-        x = self.upsample5_0(x)
+        x = self.upsample5_0(x, max_indices1_0, output_size=stage1_input_size)
         x = self.regular5_1(x)
-        x = self.transposed_conv(x)
+        x = self.transposed_conv(x, output_size=input_size)
 
         return x
