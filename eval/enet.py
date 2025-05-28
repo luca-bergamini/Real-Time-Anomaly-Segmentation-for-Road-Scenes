@@ -453,7 +453,7 @@ class UpsamplingBottleneck(nn.Module):
 
         # Extension branch
         ext = self.ext_conv1(x)
-        ext = self.ext_tconv1(ext, output_size=output_size)
+        ext = self.ext_tconv1(ext)
         ext = self.ext_tconv1_bnorm(ext)
         ext = self.ext_tconv1_activation(ext)
         ext = self.ext_conv2(ext)
@@ -619,13 +619,13 @@ class Net(nn.Module):
         x = self.dilated3_7(x)
 
         # Stage 4 - Decoder
-        x = self.upsample4_0(x, max_indices2_0, output_size=stage2_input_size)
+        x = self.upsample4_0(x, max_indices2_0)
         x = self.regular4_1(x)
         x = self.regular4_2(x)
 
         # Stage 5 - Decoder
-        x = self.upsample5_0(x, max_indices1_0, output_size=stage1_input_size)
+        x = self.upsample5_0(x, max_indices1_0)
         x = self.regular5_1(x)
-        x = self.transposed_conv(x, output_size=input_size)
+        x = self.transposed_conv(x)
 
         return x
