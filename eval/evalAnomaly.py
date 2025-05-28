@@ -12,10 +12,7 @@ from argparse import ArgumentParser
 from ood_metrics import fpr_at_95_tpr, calc_metrics, plot_roc, plot_pr,plot_barcode
 from sklearn.metrics import roc_auc_score, roc_curve, auc, precision_recall_curve, average_precision_score
 from torchvision.transforms import Compose, Resize, ToTensor
-import copy
 import torch.nn.utils.prune as prune
-import time
-from fvcore.nn import FlopCountAnalysis
 import torch.nn as nn
 
 seed = 42
@@ -44,15 +41,6 @@ def prune_model(model, amount):
         amount=amount,
     )
     return model
-
-# --- COUNT NONZERO PARAMETERS ---
-def count_nonzero_parameters(model):
-    total_params = 0
-    nonzero_params = 0
-    for param in model.parameters():
-        total_params += param.numel()
-        nonzero_params += param.nonzero().size(0)
-    return total_params, nonzero_params
 
 def main():
     parser = ArgumentParser()
@@ -115,42 +103,18 @@ def main():
     if args.pruning > 0.0:
         model = prune_model(model, amount=args.pruning)
 
-    # --- DEEP COPY FOR SAFE ANALYSIS ---
-    model_for_analysis = copy.deepcopy(model.module if isinstance(model, torch.nn.DataParallel) else model)
-    model_for_analysis.eval()
-
-    # --- FLOPs ANALYSIS ---
-    dummy_input = torch.randn(1, 3, 512, 1024).to(next(model.parameters()).device)
-    with torch.no_grad():
-        flop_analyzer = FlopCountAnalysis(model_for_analysis, dummy_input)
-        total_flops = flop_analyzer.total()
-
-    # --- EFFECTIVE FLOPs ---
-    total_params, nonzero_params = count_nonzero_parameters(model_for_analysis)
-    sparsity_ratio = nonzero_params / total_params
-    effective_flops = total_flops * sparsity_ratio
-
-    print(f"Total Pruned FLOPs: {effective_flops / 1e9:.2f} GFLOPs")
-
-    # --- THEORETICAL INFERENCE TIME ---
-    t4_flops_per_sec = 641.19e9  # T4 throughput in FLOPs/s
-    theoretical_time_sec = effective_flops / t4_flops_per_sec
-    print(f"Estimated theoretical inference time: {theoretical_time_sec:.6f} seconds")
-
     model.eval()
 
     image_transform = Compose([Resize((512, 1024), Image.BILINEAR), ToTensor()])
     target_transform = Compose([Resize((512, 1024), Image.NEAREST)])
+
     
     for path in glob.glob(os.path.expanduser(str(args.input[0]))):
 
         images = image_transform((Image.open(path).convert('RGB'))).unsqueeze(0).float().cuda()
 
         with torch.no_grad():
-            start_time = time.time()
             result = model(images) / args.temperature
-            end_time = time.time()
-            print(f"Real inference time: {(end_time - start_time):.6f} seconds")
 
         if args.method == 'Void':
             anomaly_result = torch.nn.functional.softmax(result, dim=1)[:, 19, :, :]
