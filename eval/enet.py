@@ -326,6 +326,8 @@ class DownsamplingBottleneck(nn.Module):
         # Main branch shortcut
         if self.return_indices:
             main, max_indices = self.main_max1(x)
+            # Store the max indices for unpooling later
+            self.max_indices = max_indices
         else:
             main = self.main_max1(x)
             self.max_indices = None
@@ -344,10 +346,7 @@ class DownsamplingBottleneck(nn.Module):
 
         out = main + ext
 
-        if self.return_indices:
-            return self.out_activation(out), max_indices
-        else:
-            return self.out_activation(out)
+        return self.out_activation(out)
 
 
 class UpsamplingBottleneck(nn.Module):
@@ -591,8 +590,8 @@ class Net(nn.Module):
 
         # Stage 1 - Encoder
         stage1_input_size = x.size()
-        x, max_indices1_0 = self.downsample1_0(x)
-        print(type(max_indices1_0))
+        x = self.downsample1_0(x)
+        max_indices1_0 = self.downsample1_0.max_indices
         x = self.regular1_1(x)
         x = self.regular1_2(x)
         x = self.regular1_3(x)
@@ -600,7 +599,8 @@ class Net(nn.Module):
 
         # Stage 2 - Encoder
         stage2_input_size = x.size()
-        x, max_indices2_0 = self.downsample2_0(x)
+        x = self.downsample2_0(x)
+        max_indices2_0 = self.downsample2_0.max_indices
         x = self.regular2_1(x)
         x = self.dilated2_2(x)
         x = self.asymmetric2_3(x)
