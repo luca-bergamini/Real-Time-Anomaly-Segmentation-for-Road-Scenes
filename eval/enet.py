@@ -443,15 +443,15 @@ class UpsamplingBottleneck(nn.Module):
         # PReLU layer to apply after concatenating the branches
         self.out_activation = activation()
 
-    def forward(self, x, max_indices, output_size):
+    def forward(self, x, max_indices=None, output_size=None):
         # Main branch shortcut
         main = self.main_conv1(x)
-        main = self.main_unpool1(
-            main, max_indices, output_size=output_size)
+        if max_indices is not None and output_size is not None:
+            main = self.main_unpool1(main, max_indices, output_size=output_size)
 
         # Extension branch
         ext = self.ext_conv1(x)
-        ext = self.ext_tconv1(ext, output_size=output_size)
+        ext = self.ext_tconv1(ext)
         ext = self.ext_tconv1_bnorm(ext)
         ext = self.ext_tconv1_activation(ext)
         ext = self.ext_conv2(ext)
@@ -583,7 +583,6 @@ class Net(nn.Module):
 
     def forward(self, x, only_encode=False):
         # Initial block
-        input_size = x.size()
         x = self.initial_block(x)
 
         # Stage 1 - Encoder
