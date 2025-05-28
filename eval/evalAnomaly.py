@@ -13,7 +13,8 @@ from ood_metrics import fpr_at_95_tpr, calc_metrics, plot_roc, plot_pr,plot_barc
 from sklearn.metrics import roc_auc_score, roc_curve, auc, precision_recall_curve, average_precision_score
 from torchvision.transforms import Compose, Resize, ToTensor
 import torch.nn.functional as F
-from torch.ao.quantization import get_default_qconfig_mapping, prepare_fx, convert_fx
+from torch.ao.quantization import get_default_qconfig_mapping
+from torch.ao.quantization.quantize_fx import prepare_fx, convert_fx
 import sys
 
 seed = 42
