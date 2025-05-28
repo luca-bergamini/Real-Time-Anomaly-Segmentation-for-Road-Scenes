@@ -53,23 +53,25 @@ def main(args):
 
     #model = ERFNet(NUM_CLASSES)
     #model_file = importlib.import_module(args.loadModel[:-3])
-    
-    # Add the `train/` directory to sys.path
-    train_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "train"))
-    if train_dir not in sys.path:
-        sys.path.insert(0, train_dir)
-    
     model_path = args.loadModel
-    model_name = "bisenet"
-
-    if not os.path.isabs(model_path):
-        # Convert to absolute path relative to current working directory
-        model_path = os.path.abspath(model_path)
-
-    spec = importlib.util.spec_from_file_location(model_name, model_path)
-    model_file = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(model_file)
     
+    if os.path.splitext(os.path.basename(args.loadModel))[0] == "bisenet":
+        # Add the `train/` directory to sys.path
+        train_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "train"))
+        if train_dir not in sys.path:
+            sys.path.insert(0, train_dir)
+        model_name = "bisenet"
+
+        if not os.path.isabs(model_path):
+            # Convert to absolute path relative to current working directory
+            model_path = os.path.abspath(model_path)
+
+        spec = importlib.util.spec_from_file_location(model_name, model_path)
+        model_file = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(model_file)
+    else:
+        model_file = importlib.import_module(args.loadModel[:-3])
+        
     model = model_file.Net(NUM_CLASSES)
 
     #model = torch.nn.DataParallel(model)
