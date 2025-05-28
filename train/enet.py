@@ -337,15 +337,11 @@ class DownsamplingBottleneck(nn.Module):
         ch_main = main.size()[1]
         pad_channels = ch_ext - ch_main
 
-        if is_tracing():
-            # If we are tracing, we need to pad with zeros
+        if pad_channels > 0:
             padding = torch.zeros((n, pad_channels, h, w), device=main.device, dtype=main.dtype)
-        else:
-            if pad_channels > 0:
-                padding = torch.zeros((n, pad_channels, h, w), device=main.device, dtype=main.dtype)
-                main = torch.cat((main, padding), dim=1)
-            elif pad_channels < 0:
-                main = main[:, :ch_ext, :, :]
+            main = torch.cat((main, padding), dim=1)
+        elif pad_channels < 0:
+            main = main[:, :ch_ext, :, :]
 
         # Add main and extension branches
         out = main + ext
