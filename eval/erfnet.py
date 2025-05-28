@@ -135,8 +135,9 @@ class Decoder (nn.Module):
 
 
 class Net(nn.Module):
-    def __init__(self, num_classes, encoder=None):  #use encoder to pass pretrained encoder
+    def __init__(self, num_classes, encoder=None, only_encode=False):  #use encoder to pass pretrained encoder
         super().__init__()
+        self.only_encode = only_encode
 
         if (encoder == None):
             self.encoder = Encoder(num_classes)
@@ -144,10 +145,14 @@ class Net(nn.Module):
             self.encoder = encoder
         self.decoder = Decoder(num_classes)
 
-    def forward(self, input, only_encode=False):
-        if only_encode:
-            return self.encoder.forward(input, predict=True)
+    def forward(self, input):
+        if self.only_encode:
+            #return self.encoder.forward(input, predict=True)
+            return self.encoder(input)
         else:
-            output = self.encoder(input)    #predict=False by default
-            return self.decoder.forward(output)
+            """ output = self.encoder(input)    #predict=False by default
+            return self.decoder.forward(output) """
+            x = self.encoder(input)
+            x = self.decoder(x)
+            return x
 
