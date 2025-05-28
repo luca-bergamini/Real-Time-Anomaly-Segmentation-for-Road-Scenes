@@ -25,7 +25,6 @@ from torch.ao.quantization import get_default_qconfig_mapping
 from torch.ao.quantization.quantize_fx import prepare_fx, convert_fx
 
 from dataset import cityscapes
-from erfnet import ERFNet
 from transform import Relabel, ToLabel, Colorize
 from iouEval import iouEval, getColorEntry
 

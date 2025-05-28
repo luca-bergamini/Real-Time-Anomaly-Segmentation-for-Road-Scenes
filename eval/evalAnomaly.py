@@ -6,7 +6,6 @@ import torch
 import random
 from PIL import Image
 import numpy as np
-from erfnet import ERFNet
 import importlib
 import os.path as osp
 from argparse import ArgumentParser
