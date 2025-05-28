@@ -96,21 +96,21 @@ def main(args):
     print(f"Pruned percentage: {(1 - nonzero / total) * 100:.2f}%")
 
         # === FLOPs and theoretical time estimation ===
-    dummy_input = torch.randn(1, 3, 512, 1024).to(next(model.parameters()).device)
-    model_for_flops = model.module if isinstance(model, torch.nn.DataParallel) else model
+    # dummy_input = torch.randn(1, 3, 512, 1024).to(next(model.parameters()).device)
+    # model_for_flops = model.module if isinstance(model, torch.nn.DataParallel) else model
 
-    flop_analyzer = FlopCountAnalysis(model_for_flops, dummy_input)
-    total_flops = flop_analyzer.total()
+    # flop_analyzer = FlopCountAnalysis(model_for_flops, dummy_input)
+    # total_flops = flop_analyzer.total()
 
-    total_params, nonzero_params = count_nonzero_parameters(model)
-    sparsity_ratio = nonzero_params / total_params
+    # total_params, nonzero_params = count_nonzero_parameters(model)
+    # sparsity_ratio = nonzero_params / total_params
 
-    effective_flops = total_flops * sparsity_ratio
-    print(f"Total FLOPs: {effective_flops / 1e9:.2f} GFLOPs")
+    # effective_flops = total_flops * sparsity_ratio
+    # print(f"Total FLOPs: {effective_flops / 1e9:.2f} GFLOPs")
 
-    t4_flops_per_sec = 641.19e9  # 641 GFLOPS/s to match real inference time
-    theoretical_time_sec = effective_flops / t4_flops_per_sec
-    print(f"Estimated time: {theoretical_time_sec:.6f} seconds")
+    # t4_flops_per_sec = 641.19e9  # 641 GFLOPS/s to match real inference time
+    # theoretical_time_sec = effective_flops / t4_flops_per_sec
+    # print(f"Estimated time: {theoretical_time_sec:.6f} seconds")
 
     model.eval()
 
