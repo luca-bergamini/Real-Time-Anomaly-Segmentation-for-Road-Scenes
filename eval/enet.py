@@ -590,8 +590,12 @@ class Net(nn.Module):
 
         # Stage 1 - Encoder
         stage1_input_size = x.size()
-        x = self.downsample1_0(x)
-        max_indices1_0 = self.downsample1_0.max_indices
+        if self.downsample1_0.return_indices:
+            x, max_indices1_0 = self.downsample1_0(x)
+        else:
+            x = self.downsample1_0(x)
+            max_indices1_0 = None
+
         x = self.regular1_1(x)
         x = self.regular1_2(x)
         x = self.regular1_3(x)
@@ -599,8 +603,12 @@ class Net(nn.Module):
 
         # Stage 2 - Encoder
         stage2_input_size = x.size()
-        x = self.downsample2_0(x)
-        max_indices2_0 = self.downsample2_0.max_indices
+        if self.downsample2_0.return_indices:
+            x, max_indices2_0 = self.downsample2_0(x)
+        else:
+            x = self.downsample2_0(x)
+            max_indices2_0 = None
+
         x = self.regular2_1(x)
         x = self.dilated2_2(x)
         x = self.asymmetric2_3(x)
@@ -631,4 +639,3 @@ class Net(nn.Module):
         x = self.transposed_conv(x)
 
         return x
-    
