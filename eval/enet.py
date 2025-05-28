@@ -335,18 +335,17 @@ class DownsamplingBottleneck(nn.Module):
         # Main branch channel padding
         n, ch_ext, h, w = ext.size()
         ch_main = main.size()[1]
-        pad_channels = ch_ext - ch_main
+        
+        padding_channels = ch_ext - ch_main
+        if padding_channels > 0:
+            main = torch.nn.functional.pad(main, (0, 0, 0, 0, 0, padding_channels))
 
-        if pad_channels > 0:
-            padding = torch.zeros((n, pad_channels, h, w), device=main.device, dtype=main.dtype)
-            main = torch.cat((main, padding), dim=1)
-        elif pad_channels < 0:
-            main = main[:, :ch_ext, :, :]
-
-        # Add main and extension branches
         out = main + ext
 
-        return self.out_activation(out), max_indices
+        if self.return_indices:
+            return self.out_activation(out), max_indices
+        else:
+            return self.out_activation(out)
 
 
 class UpsamplingBottleneck(nn.Module):
