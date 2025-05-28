@@ -29,18 +29,13 @@ torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = True
 
 # --- PRUNE MODEL ---
-def prune_model(model, amount):
-    parameters_to_prune = []
-    for name, module in model.named_modules():
-        if isinstance(module, (nn.Conv2d, nn.Linear)):
-            parameters_to_prune.append((module, 'weight'))
-
-    prune.global_unstructured(
-        parameters_to_prune,
-        pruning_method=prune.L1Unstructured,
-        amount=amount,
-    )
-    return model
+def prune_model(model, amount=0.3):
+        for name, module in model.named_modules():
+            if isinstance(module, torch.nn.Conv2d):
+                prune.l1_unstructured(module, name='weight', amount=amount)
+                # Optional: remove pruning reparameterization so weights are actually pruned
+                prune.remove(module, 'weight')
+        return model
 
 def main():
     parser = ArgumentParser()
