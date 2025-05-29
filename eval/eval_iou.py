@@ -25,8 +25,6 @@ from torch.ao.quantization import get_default_qconfig_mapping
 from torch.ao.quantization.quantize_fx import prepare_fx, convert_fx
 
 from dataset import cityscapes
-from erfnet import ERFNet
-from enet import Net
 from transform import Relabel, ToLabel, Colorize
 from iouEval import iouEval, getColorEntry
 from fvcore.nn import FlopCountAnalysis
@@ -53,7 +51,40 @@ def main(args):
     #print ("Loading model: " + modelpath)
     #print ("Loading weights: " + weightspath)
 
-    model = Net(NUM_CLASSES)
+    model_path = args.loadModel
+    
+    if os.path.splitext(os.path.basename(args.loadModel))[0] == "bisenet":
+        # Add the `train/` directory to sys.path
+        train_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "train"))
+        if train_dir not in sys.path:
+            sys.path.insert(0, train_dir)
+        model_name = "bisenet"
+
+        if not os.path.isabs(model_path):
+            # Convert to absolute path relative to current working directory
+            model_path = os.path.abspath(model_path)
+
+        spec = importlib.util.spec_from_file_location(model_name, model_path)
+        model_file = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(model_file)
+    elif os.path.splitext(os.path.basename(args.loadModel))[0] == "bisenet":
+        # Add the `train/` directory to sys.path
+        train_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "train"))
+        if train_dir not in sys.path:
+            sys.path.insert(0, train_dir)
+        model_name = "enet"
+
+        if not os.path.isabs(model_path):
+            # Convert to absolute path relative to current working directory
+            model_path = os.path.abspath(model_path)
+
+        spec = importlib.util.spec_from_file_location(model_name, model_path)
+        model_file = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(model_file)
+    else:
+        model_file = importlib.import_module(args.loadModel[:-3])
+        
+    model = model_file.Net(NUM_CLASSES)
 
     #model = torch.nn.DataParallel(model)
     if (not args.cpu):
@@ -120,40 +151,6 @@ def main(args):
 
 
     loader = DataLoader(cityscapes(args.datadir, input_transform_cityscapes, target_transform_cityscapes, subset=args.subset), num_workers=args.num_workers, batch_size=args.batch_size, shuffle=False)
-    
-    # ---------------- QUANTIZATION ----------------
-    if args.quantize:
-        print("Preparing FX Graph Mode quantization...")
-
-        # Must run on CPU for quantization
-        model = model.cpu()
-        model.eval()
-
-        # Specify quantization config (static)
-        qconfig_mapping = get_default_qconfig_mapping("fbgemm")
-
-        # Dummy input (shape must match your training input)
-        example_inputs = torch.randn(1, 3, 512, 1024)
-
-        # FX prepare step: insert observers for calibration
-        model_prepared = prepare_fx(model, qconfig_mapping, example_inputs)
-
-        print("Calibrating model...")
-        # Calibrate the model using a few samples
-        with torch.no_grad():
-            for i, (images, labels, _, _) in enumerate(loader):
-                model_prepared(images.cpu())
-                if i >= 10:
-                    break
-
-        # Convert to quantized model
-        model_quantized = convert_fx(model_prepared)
-
-        print("Model quantized.")
-        model = model_quantized  # Replace model with quantized version
-        model.eval()
-        torch.save(model.state_dict(), "quantized_model.pth")
-    # ---------------- ENDING QUANTIZATION ----------------
 
     if(not os.path.exists(args.datadir)):
         print ("Error: datadir could not be loaded")
