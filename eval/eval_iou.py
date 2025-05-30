@@ -90,8 +90,6 @@ def main(args):
         for name, param in new_state_dict.items():
             if name in own_state:
                 own_state[name].copy_(param)
-            else:
-                print(f"Parameter {name} not found in model. Skipping.")
         return model
 
 
