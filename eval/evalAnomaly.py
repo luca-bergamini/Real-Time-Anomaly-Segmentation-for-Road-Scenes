@@ -192,7 +192,10 @@ def main():
         start_infer = time.time()
         
         with torch.no_grad():
-            result = model(images) / args.temperature
+            if not os.path.splitext(os.path.basename(args.loadModel))[0] == "bisenet":
+                result = model(images) / args.temperature
+            else:
+                result = model(images)
 
         if not args.cpu:
             torch.cuda.synchronize()  # Wait for GPU ops to finish
@@ -203,6 +206,7 @@ def main():
 
         if os.path.splitext(os.path.basename(args.loadModel))[0] == "bisenet":
             result = result[0]
+            result = result / args.temperature
 
         if args.method == 'Void':
             anomaly_result = F.softmax(result, dim=1)[:, 19, :, :]
