@@ -23,6 +23,9 @@ from torchvision.transforms import ToTensor, ToPILImage
 from torch.quantization import get_default_qconfig
 from torch.ao.quantization import get_default_qconfig_mapping
 from torch.ao.quantization.quantize_fx import prepare_fx, convert_fx
+import torch.nn.utils.prune as prune
+from fvcore.nn import FlopCountAnalysis
+import copy
 
 from dataset import cityscapes
 from transform import Relabel, ToLabel, Colorize
@@ -94,8 +97,54 @@ def main(args):
 
     model = load_my_state_dict(model, torch.load(weightspath, map_location=lambda storage, loc: storage))
     #print ("Model and weights LOADED successfully")
+
+    def prune_model(model, amount=0.3):
+        print(f"Applying unstructured L1 pruning with {amount * 100}% sparsity to Conv2d layers...")
+        for name, module in model.named_modules():
+            if isinstance(module, torch.nn.Conv2d):
+                prune.l1_unstructured(module, name='weight', amount=amount)
+                # Optional: remove pruning reparameterization so weights are actually pruned
+                prune.remove(module, 'weight')
+        return model
+
+    if args.pruning> 0:
+        model = prune_model(model, amount=args.pruning)
+
+    def count_nonzero_parameters(model):
+        total_params = 0
+        nonzero_params = 0
+        for param in model.parameters():
+            total_params += param.numel()
+            nonzero_params += param.nonzero().size(0)
+        return total_params, nonzero_params
+
+    total, nonzero = count_nonzero_parameters(model)
+    print(f"Total parameters: {total} | Non-zero (effective) parameters after pruning: {nonzero}")
+    print(f"Pruned percentage: {(1 - nonzero / total) * 100:.2f}%")
+
+    #=== FLOPs and theoretical time estimation ===
+    model_copy = copy.deepcopy(model.module if isinstance(model, torch.nn.DataParallel) else model)
+
+    dummy_input = torch.randn(1, 3, 512, 1024).to(next(model.parameters()).device)
+    flop_analyzer = FlopCountAnalysis(model_copy, dummy_input)
+    total_flops = flop_analyzer.total()
+
+    total_params, nonzero_params = count_nonzero_parameters(model)
+    sparsity_ratio = nonzero_params / total_params
+
+    effective_flops = total_flops * sparsity_ratio
+    print(f"Total FLOPs: {effective_flops / 1e9:.2f} GFLOPs")
+
+    t4_flops_per_sec = 641.19e9
+    theoretical_time_sec = effective_flops / t4_flops_per_sec
+    print(f"Estimated time: {theoretical_time_sec:.6f} seconds")
+
     model.eval()
-    
+
+    if(not os.path.exists(args.datadir)):
+        print ("Error: datadir could not be loaded")
+
+
     loader = DataLoader(cityscapes(args.datadir, input_transform_cityscapes, target_transform_cityscapes, subset=args.subset), num_workers=args.num_workers, batch_size=args.batch_size, shuffle=False)
 
     # ---------------- QUANTIZATION ----------------
@@ -223,5 +272,6 @@ if __name__ == '__main__':
     parser.add_argument('--cpu', action='store_true')
     parser.add_argument('--void', action='store_true')
     parser.add_argument('--quantize', action='store_true')
+    parser.add_argument('--pruning', type=float, default=0.0, help="Amount of structured pruning (0 to disable)")
 
     main(parser.parse_args())

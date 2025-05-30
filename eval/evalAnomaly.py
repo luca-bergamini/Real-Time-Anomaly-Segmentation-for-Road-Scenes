@@ -18,6 +18,8 @@ from torch.ao.quantization.observer import MinMaxObserver, PerChannelMinMaxObser
 from torch.ao.quantization.quantize_fx import prepare_fx, convert_fx
 import sys
 import time
+import torch.nn.utils.prune as prune
+import torch.nn as nn
 
 seed = 42
 
@@ -31,6 +33,15 @@ NUM_CLASSES = 20
 # gpu training specific
 torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = True
+
+# --- PRUNE MODEL ---
+def prune_model(model, amount=0.3):
+        for name, module in model.named_modules():
+            if isinstance(module, torch.nn.Conv2d):
+                prune.l1_unstructured(module, name='weight', amount=amount)
+                # Optional: remove pruning reparameterization so weights are actually pruned
+                prune.remove(module, 'weight')
+        return model
 
 def main():
     parser = ArgumentParser()
@@ -51,7 +62,10 @@ def main():
     parser.add_argument('--cpu', action='store_true')
     parser.add_argument('--method', default='MSP', choices=['MSP', 'MaxLogit', 'MaxEntropy', 'Void'],
                     help="Choose OOD scoring method: MSP, MaxLogit, or MaxEntropy")
+    parser.add_argument('--temperature', type=float, default=1.0,
+                        help="Temperature scaling for softmax/logit OOD scoring")
     parser.add_argument('--quantize', action='store_true')
+    parser.add_argument('--pruning', type=float, default=0.0 )
     args = parser.parse_args()
     anomaly_score_list = []
     ood_gts_list = []
@@ -108,6 +122,11 @@ def main():
 
     model = load_my_state_dict(model, torch.load(weightspath, map_location=lambda storage, loc: storage))
     #print ("Model and weights LOADED successfully")
+
+    # --- PRUNE ---
+    if args.pruning > 0.0:
+        model = prune_model(model, amount=args.pruning)
+
     model.eval()
 
     image_transform = Compose([Resize((512, 1024), Image.BILINEAR), ToTensor()])
@@ -160,12 +179,12 @@ def main():
     
     for path in glob.glob(os.path.expanduser(str(args.input[0]))):
 
-        image_tensor = image_transform((Image.open(path).convert('RGB'))).unsqueeze(0).float()
+        images = image_transform((Image.open(path).convert('RGB'))).unsqueeze(0).float().cuda()
 
         if args.cpu:
-            images = image_tensor.cpu()
+            images = images.cpu()
         else:
-            images = image_tensor.cuda()
+            images = images.cuda()
             
         if not args.cpu:
             torch.cuda.synchronize()  # Ensure all GPU ops are done before timing
@@ -173,22 +192,23 @@ def main():
         start_infer = time.time()
         
         with torch.no_grad():
-            result = model(images)
-            
+            result = model(images) / args.temperature
+
         if not args.cpu:
             torch.cuda.synchronize()  # Wait for GPU ops to finish
 
         end_infer = time.time()
         total_inference_time += (end_infer - start_infer)
         num_images += 1
-            
+
         if os.path.splitext(os.path.basename(args.loadModel))[0] == "bisenet":
             result = result[0]
 
         if args.method == 'Void':
-            anomaly_result = F.softmax(result, dim=1)[:, 19, :, :]
+            anomaly_result = torch.nn.functional.softmax(result, dim=1)[:, 19, :, :]
             anomaly_result = anomaly_result.data.cpu().numpy().squeeze()
-        elif args.method == 'MSP':
+
+        if args.method == 'MSP':
             softmax_probs = torch.nn.functional.softmax(result, dim=1)
             msp = torch.max(softmax_probs, dim=1)[0].cpu().numpy().squeeze()
             anomaly_result = 1.0 - msp
