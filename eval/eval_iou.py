@@ -86,8 +86,6 @@ def main(args):
             if name not in own_state:
                 if name.startswith("module."):
                     own_state[name.split("module.")[-1]].copy_(param)
-                elif args.loadModel != "erfnet.py":
-                    own_state["module."+name].copy_(param)
                 else:
                     print(name, " not loaded")
                     continue
