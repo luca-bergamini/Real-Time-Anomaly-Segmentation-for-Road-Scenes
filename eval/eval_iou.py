@@ -80,15 +80,16 @@ def main(args):
     if (not args.cpu):
         model = torch.nn.DataParallel(model).cuda()
 
-    def load_my_state_dict(model, state_dict):
+    def load_my_state_dict(model, state_dict):  #custom function to load model when not all dict elements
         own_state = model.state_dict()
-        new_state_dict = {}
-        for k, v in state_dict.items():
-            key = k.replace("module.", "")
-            new_state_dict[key] = v
-
-        for name, param in new_state_dict.items():
-            if name in own_state:
+        for name, param in state_dict.items():
+            if name not in own_state:
+                if name.startswith("module."):
+                    own_state[name.split("module.")[-1]].copy_(param)
+                else:
+                    print(name, " not loaded")
+                    continue
+            else:
                 own_state[name].copy_(param)
         return model
 
