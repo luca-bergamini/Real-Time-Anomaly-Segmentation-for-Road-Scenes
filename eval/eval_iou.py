@@ -124,7 +124,7 @@ def main(args):
     #=== FLOPs and theoretical time estimation ===
     model_copy = copy.deepcopy(model.module if isinstance(model, torch.nn.DataParallel) else model)
 
-    dummy_input = torch.randn(1, 3, 512, 1024).to(next(model.parameters()).device)
+    dummy_input = torch.randn(1, 3, 512, 1024).to(next(model_copy.parameters()).device)
     flop_analyzer = FlopCountAnalysis(model_copy, dummy_input)
     total_flops = flop_analyzer.total()
 
