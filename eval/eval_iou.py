@@ -19,15 +19,17 @@ from torch.autograd import Variable
 from torch.utils.data import DataLoader
 from torchvision.transforms import Compose, CenterCrop, Normalize, Resize
 from torchvision.transforms import ToTensor, ToPILImage
-import torch.nn.utils.prune as prune
+#import torch.quantization
 from torch.quantization import get_default_qconfig
 from torch.ao.quantization import get_default_qconfig_mapping
 from torch.ao.quantization.quantize_fx import prepare_fx, convert_fx
+import torch.nn.utils.prune as prune
+from fvcore.nn import FlopCountAnalysis
+import copy
 
 from dataset import cityscapes
 from transform import Relabel, ToLabel, Colorize
 from iouEval import iouEval, getColorEntry
-from fvcore.nn import FlopCountAnalysis
 
 NUM_CHANNELS = 3
 NUM_CLASSES = 20
@@ -51,6 +53,8 @@ def main(args):
     #print ("Loading model: " + modelpath)
     #print ("Loading weights: " + weightspath)
 
+    #model = ERFNet(NUM_CLASSES)
+    #model_file = importlib.import_module(args.loadModel[:-3])
     model_path = args.loadModel
     
     if os.path.splitext(os.path.basename(args.loadModel))[0] == "bisenet":
@@ -59,20 +63,6 @@ def main(args):
         if train_dir not in sys.path:
             sys.path.insert(0, train_dir)
         model_name = "bisenet"
-
-        if not os.path.isabs(model_path):
-            # Convert to absolute path relative to current working directory
-            model_path = os.path.abspath(model_path)
-
-        spec = importlib.util.spec_from_file_location(model_name, model_path)
-        model_file = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(model_file)
-    elif os.path.splitext(os.path.basename(args.loadModel))[0] == "enet":
-        # Add the `train/` directory to sys.path
-        train_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "train"))
-        if train_dir not in sys.path:
-            sys.path.insert(0, train_dir)
-        model_name = "enet"
 
         if not os.path.isabs(model_path):
             # Convert to absolute path relative to current working directory
@@ -103,10 +93,9 @@ def main(args):
                 own_state[name].copy_(param)
         return model
 
+
     model = load_my_state_dict(model, torch.load(weightspath, map_location=lambda storage, loc: storage))
     #print ("Model and weights LOADED successfully")
-
-     # ---------------- PRUNING ----------------
 
     def prune_model(model, amount=0.3):
         print(f"Applying unstructured L1 pruning with {amount * 100}% sparsity to Conv2d layers...")
@@ -117,7 +106,7 @@ def main(args):
                 prune.remove(module, 'weight')
         return model
 
-    if args.pruning> 0:
+    if args.pruning> 0.0:
         model = prune_model(model, amount=args.pruning)
 
     def count_nonzero_parameters(model):
@@ -132,11 +121,12 @@ def main(args):
     print(f"Total parameters: {total} | Non-zero (effective) parameters after pruning: {nonzero}")
     print(f"Pruned percentage: {(1 - nonzero / total) * 100:.2f}%")
 
-        # === FLOPs and theoretical time estimation ===
-    dummy_input = torch.randn(1, 3, 512, 1024).to(next(model.parameters()).device)
-    model_for_flops = model.module if isinstance(model, torch.nn.DataParallel) else model
+    #=== FLOPs and theoretical time estimation ===
+    model_copy = copy.deepcopy(model.module if isinstance(model, torch.nn.DataParallel) else model)
+    model_copy.eval()
 
-    flop_analyzer = FlopCountAnalysis(model_for_flops, dummy_input)
+    dummy_input = torch.randn(1, 3, 512, 1024).to(next(model_copy.parameters()).device)
+    flop_analyzer = FlopCountAnalysis(model_copy, dummy_input)
     total_flops = flop_analyzer.total()
 
     total_params, nonzero_params = count_nonzero_parameters(model)
@@ -145,17 +135,56 @@ def main(args):
     effective_flops = total_flops * sparsity_ratio
     print(f"Total FLOPs: {effective_flops / 1e9:.2f} GFLOPs")
 
-    t4_flops_per_sec = 641.19e9  # 641 GFLOPS/s to match real inference time
+    t4_flops_per_sec = 641.19e9
     theoretical_time_sec = effective_flops / t4_flops_per_sec
     print(f"Estimated time: {theoretical_time_sec:.6f} seconds")
 
-
-    loader = DataLoader(cityscapes(args.datadir, input_transform_cityscapes, target_transform_cityscapes, subset=args.subset), num_workers=args.num_workers, batch_size=args.batch_size, shuffle=False)
+    model.eval()
 
     if(not os.path.exists(args.datadir)):
         print ("Error: datadir could not be loaded")
 
 
+    loader = DataLoader(cityscapes(args.datadir, input_transform_cityscapes, target_transform_cityscapes, subset=args.subset), num_workers=args.num_workers, batch_size=args.batch_size, shuffle=False)
+
+    # ---------------- QUANTIZATION ----------------
+    if args.quantize:
+        print("Preparing FX Graph Mode quantization...")
+
+        # Must run on CPU for quantization
+        model = model.cpu()
+        model.eval()
+
+        # Specify quantization config (static)
+        qconfig_mapping = get_default_qconfig_mapping("fbgemm")
+
+        # Dummy input (shape must match your training input)
+        example_inputs = torch.randn(1, 3, 512, 1024)
+
+        # FX prepare step: insert observers for calibration
+        model_prepared = prepare_fx(model, qconfig_mapping, example_inputs)
+
+        print("Calibrating model...")
+        # Calibrate the model using a few samples
+        with torch.no_grad():
+            for i, (images, labels, _, _) in enumerate(loader):
+                model_prepared(images.cpu())
+                if i >= 10:
+                    break
+
+        # Convert to quantized model
+        model_quantized = convert_fx(model_prepared)
+
+        print("Model quantized.")
+        model = model_quantized  # Replace model with quantized version
+        model.eval()
+        torch.save(model.state_dict(), "quantized_model.pth")
+    # ---------------- ENDING QUANTIZATION ----------------
+
+    if(not os.path.exists(args.datadir)):
+        print ("Error: datadir could not be loaded")
+
+    #iouEvalVal = iouEval(NUM_CLASSES)
     if args.void:
         iouEvalVal = iouEval(NUM_CLASSES, 20)
     else:
@@ -177,6 +206,9 @@ def main(args):
 
         with torch.no_grad():
             outputs = model(inputs)
+            
+        if os.path.splitext(os.path.basename(args.loadModel))[0] == "bisenet":
+            outputs = outputs[1]
 
         if not args.cpu:
             torch.cuda.synchronize()  # Wait for GPU ops to finish
@@ -186,11 +218,11 @@ def main(args):
         num_images += images.size(0)  # count per-image even with batch_size > 1
 
         iouEvalVal.addBatch(outputs.max(1)[1].unsqueeze(1).data, labels)
-
+        
     iouVal, iou_classes = iouEvalVal.getIoU()
 
     iou_classes_str = []
-    for i in range(iou_classes.size(0)):
+    for i in tqdm(range(iou_classes.size(0)), desc="Processing IoU classes"):
         iouStr = getColorEntry(iou_classes[i])+'{:0.2f}'.format(iou_classes[i]*100) + '\033[0m'
         iou_classes_str.append(iouStr)
 
@@ -239,7 +271,7 @@ if __name__ == '__main__':
     parser.add_argument('--batch-size', type=int, default=1)
     parser.add_argument('--cpu', action='store_true')
     parser.add_argument('--void', action='store_true')
-    parser.add_argument('--pruning', type=float, default=0.0, help="Amount of structured pruning (0 to disable)")
     parser.add_argument('--quantize', action='store_true')
+    parser.add_argument('--pruning', type=float, default=0.0, help="Amount of structured pruning (0 to disable)")
 
     main(parser.parse_args())
