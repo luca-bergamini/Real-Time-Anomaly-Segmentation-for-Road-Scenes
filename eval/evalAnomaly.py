@@ -179,12 +179,12 @@ def main():
     
     for path in glob.glob(os.path.expanduser(str(args.input[0]))):
 
-        images = image_transform((Image.open(path).convert('RGB'))).unsqueeze(0).float().cuda()
+        images_tensor = image_transform((Image.open(path).convert('RGB'))).unsqueeze(0).float().cuda()
 
         if args.cpu:
-            images = images.cpu()
+            images = images_tensor.cpu()
         else:
-            images = images.cuda()
+            images = images_tensor.cuda()
             
         if not args.cpu:
             torch.cuda.synchronize()  # Ensure all GPU ops are done before timing
@@ -205,18 +205,15 @@ def main():
             result = result[0]
 
         if args.method == 'Void':
-            anomaly_result = torch.nn.functional.softmax(result, dim=1)[:, 19, :, :]
+            anomaly_result = F.softmax(result, dim=1)[:, 19, :, :]
             anomaly_result = anomaly_result.data.cpu().numpy().squeeze()
-
-        if args.method == 'MSP':
+        elif args.method == 'MSP':
             softmax_probs = torch.nn.functional.softmax(result, dim=1)
             msp = torch.max(softmax_probs, dim=1)[0].cpu().numpy().squeeze()
             anomaly_result = 1.0 - msp
-
         elif args.method == 'MaxLogit':
             max_logit = torch.max(result, dim=1)[0]
             anomaly_result = -max_logit.cpu().numpy().squeeze()
-
         elif args.method == 'MaxEntropy':
             probs = torch.nn.functional.softmax(result, dim=1)
             log_probs = torch.log(probs + 1e-8)
