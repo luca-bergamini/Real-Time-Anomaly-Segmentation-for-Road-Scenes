@@ -105,7 +105,7 @@ def main(args):
                 prune.remove(module, 'weight')
         return model
 
-    if args.pruning> 0:
+    if args.pruning> 0.0:
         model = prune_model(model, amount=args.pruning)
 
     def count_nonzero_parameters(model):
