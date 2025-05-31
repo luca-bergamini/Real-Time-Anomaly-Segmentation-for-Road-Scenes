@@ -4,4 +4,4 @@ datasets/
 .venv
 .idea
 imagenet/
-trained_models/
+*.tar
