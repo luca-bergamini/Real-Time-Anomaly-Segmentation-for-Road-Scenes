@@ -47,22 +47,20 @@ target_transform_cityscapes = Compose([
 
 def main(args):
 
-    modelpath = args.loadDir + args.loadModel
     weightspath = args.loadDir + args.loadWeights
 
-    #print ("Loading model: " + modelpath)
-    #print ("Loading weights: " + weightspath)
-
-    #model = ERFNet(NUM_CLASSES)
-    #model_file = importlib.import_module(args.loadModel[:-3])
     model_path = args.loadModel
     
-    if os.path.splitext(os.path.basename(args.loadModel))[0] == "bisenet":
+    if os.path.splitext(os.path.basename(args.loadModel))[0] == "bisenet" or os.path.splitext(os.path.basename(args.loadModel))[0] == "enet":
         # Add the `train/` directory to sys.path
         train_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "train"))
         if train_dir not in sys.path:
             sys.path.insert(0, train_dir)
-        model_name = "bisenet"
+
+        if os.path.splitext(os.path.basename(args.loadModel))[0] == "bisenet":
+            model_name = "bisenet"
+        else:
+            model_name = "enet"
 
         if not os.path.isabs(model_path):
             # Convert to absolute path relative to current working directory
@@ -76,7 +74,6 @@ def main(args):
         
     model = model_file.Net(NUM_CLASSES)
 
-    #model = torch.nn.DataParallel(model)
     if (not args.cpu):
         model = torch.nn.DataParallel(model).cuda()
 
@@ -95,8 +92,8 @@ def main(args):
 
 
     model = load_my_state_dict(model, torch.load(weightspath, map_location=lambda storage, loc: storage))
-    #print ("Model and weights LOADED successfully")
 
+    # --- PRUNING MODEL ---
     def prune_model(model, amount=0.3):
         print(f"Applying unstructured L1 pruning with {amount * 100}% sparsity to Conv2d layers...")
         for name, module in model.named_modules():
@@ -108,6 +105,7 @@ def main(args):
 
     if args.pruning> 0.0:
         model = prune_model(model, amount=args.pruning)
+    # --- ENDING PRUNING ---
 
     def count_nonzero_parameters(model):
         total_params = 0
@@ -144,18 +142,17 @@ def main(args):
     if(not os.path.exists(args.datadir)):
         print ("Error: datadir could not be loaded")
 
-
     loader = DataLoader(cityscapes(args.datadir, input_transform_cityscapes, target_transform_cityscapes, subset=args.subset), num_workers=args.num_workers, batch_size=args.batch_size, shuffle=False)
 
     # ---------------- QUANTIZATION ----------------
     if args.quantize:
         print("Preparing FX Graph Mode quantization...")
 
-        # Must run on CPU for quantization
+        # Using CPU for quantization
         model = model.cpu()
         model.eval()
 
-        # Specify quantization config (static)
+        # Static quantization
         qconfig_mapping = get_default_qconfig_mapping("fbgemm")
 
         # Dummy input (shape must match your training input)
@@ -184,7 +181,6 @@ def main(args):
     if(not os.path.exists(args.datadir)):
         print ("Error: datadir could not be loaded")
 
-    #iouEvalVal = iouEval(NUM_CLASSES)
     if args.void:
         iouEvalVal = iouEval(NUM_CLASSES, 20)
     else:
@@ -230,7 +226,6 @@ def main(args):
     print(f"Avg inference time per image: {total_inference_time / num_images:.4f} seconds")
     print(f"Total inference time (model only): {total_inference_time:.2f} seconds for {num_images} images")
     print("=======================================")
-    #print("TOTAL IOU: ", iou * 100, "%")
     print("Per-Class IoU:")
     print(iou_classes_str[0], "Road")
     print(iou_classes_str[1], "sidewalk")

@@ -1,2 +1,7 @@
 .DS_Store
 datasets/
+*.ipynb
+.venv
+.idea
+imagenet/
+trained_models/

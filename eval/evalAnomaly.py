@@ -42,6 +42,7 @@ def prune_model(model, amount=0.3):
                 # Optional: remove pruning reparameterization so weights are actually pruned
                 prune.remove(module, 'weight')
         return model
+# --- ENDING PRUNE MODEL ---
 
 def main():
     parser = ArgumentParser()
@@ -74,23 +75,20 @@ def main():
         open('results.txt', 'w').close()
     file = open('results.txt', 'a')
 
-    modelpath = args.loadDir + args.loadModel
     weightspath = args.loadDir + args.loadWeights
-
-    #print ("Loading model: " + modelpath)
-    #print ("Loading weights: " + weightspath)
-
-    #model_file = importlib.import_module(args.loadModel[:-3])
-    #model = ERFNet(NUM_CLASSES)
     
-    if os.path.splitext(os.path.basename(args.loadModel))[0] == "bisenet":
+    if os.path.splitext(os.path.basename(args.loadModel))[0] == "bisenet" or os.path.splitext(os.path.basename(args.loadModel))[0] == "enet":
         # Add the `train/` directory to sys.path
         train_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "train"))
         if train_dir not in sys.path:
             sys.path.insert(0, train_dir)
         
         model_path = args.loadModel
-        model_name = "bisenet"
+
+        if os.path.splitext(os.path.basename(args.loadModel))[0] == "bisenet":
+            model_name = "bisenet"
+        else:
+            model_name = "enet"
 
         if not os.path.isabs(model_path):
             # Convert to absolute path relative to current working directory
@@ -121,11 +119,11 @@ def main():
         return model
 
     model = load_my_state_dict(model, torch.load(weightspath, map_location=lambda storage, loc: storage))
-    #print ("Model and weights LOADED successfully")
 
-    # --- PRUNE ---
+    # --- PRUNING ---
     if args.pruning > 0.0:
         model = prune_model(model, amount=args.pruning)
+    # --- ENDING PRUNING ---
 
     model.eval()
 
@@ -137,7 +135,7 @@ def main():
     if args.quantize:
         print("Preparing FX Graph Mode quantization...")
 
-        # Use CPU for quantization
+        # Using CPU for quantization
         model = model.cpu()
         model.eval()
 
@@ -147,9 +145,6 @@ def main():
             weight=PerChannelMinMaxObserver.with_args(quant_min=-128, quant_max=127, dtype=torch.qint8)
         )
 
-        qconfig_mapping = QConfigMapping().set_global(custom_qconfig)
-
-        # Optional: add default mapping for fixed-qparams ops
         qconfig_mapping = torch.ao.quantization.get_default_qconfig_mapping("fbgemm")
         qconfig_mapping.set_global(custom_qconfig)
         example_inputs = torch.randn(1, 3, 512, 1024)
