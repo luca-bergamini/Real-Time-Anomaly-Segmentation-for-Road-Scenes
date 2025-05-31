@@ -28,7 +28,6 @@ from fvcore.nn import FlopCountAnalysis
 import copy
 
 from dataset import cityscapes
-from erfnet import ERFNet
 from transform import Relabel, ToLabel, Colorize
 from iouEval import iouEval, getColorEntry
 
