@@ -195,6 +195,11 @@ def main(args):
             labels = labels.cuda()
 
         inputs = Variable(images)
+
+        if not args.cpu:
+            torch.cuda.synchronize()  # Make sure all CUDA ops are done before timing
+        start_infer = time.time()
+
         with torch.no_grad():
             outputs = model(inputs)
 
