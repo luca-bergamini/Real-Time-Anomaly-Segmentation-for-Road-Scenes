@@ -174,7 +174,7 @@ def main():
 
     for path in glob.glob(os.path.expanduser(str(args.input[0]))):
 
-        images_tensor = image_transform((Image.open(path).convert('RGB'))).unsqueeze(0).float().cuda()
+        images_tensor = image_transform((Image.open(path).convert('RGB'))).unsqueeze(0).float()
 
         if args.cpu:
             images = images_tensor.cpu()
